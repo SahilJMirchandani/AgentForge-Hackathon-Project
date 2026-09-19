@@ -97,27 +97,65 @@ async function loadFileState() {
   }
 }
 
+function persistedCollections(state) {
+  return {
+    users: Object.entries(state.users || {}).map(([email, user]) => ({ _id: email, ...user })),
+    sessions: Object.entries(state.sessions || {}).map(([token, session]) => ({
+      _id: token,
+      ...(typeof session === 'string'
+        ? { email: session }
+        : { ...session, expiresAt: session?.expiresAt ? new Date(session.expiresAt) : undefined }),
+    })),
+    workflows: Object.entries(state.workflows || {}).map(([id, workflow]) => ({ _id: id, ...workflow })),
+    notifications: Object.entries(state.notifications || {}).map(([email, items]) => ({ _id: email, email, items })),
+    resetTokens: Object.entries(state.resetTokens || {}).map(([token, value]) => ({
+      _id: token,
+      ...value,
+      expiresAt: value?.expiresAt ? new Date(value.expiresAt) : undefined,
+    })),
+    oauthStates: Object.entries(state.oauthStates || {}).map(([stateKey, value]) => ({
+      _id: stateKey,
+      ...value,
+      expiresAt: value?.expiresAt ? new Date(value.expiresAt) : undefined,
+    })),
+  }
+}
+
+function documentKey(document) {
+  return document?._id
+}
+
+function documentsEqual(left, right) {
+  return JSON.stringify(left) === JSON.stringify(right)
+}
+
 export async function saveDb(db) {
   const safeDb = sanitizeDbState(db)
   writeQueue = writeQueue.catch(() => {}).then(async () => {
     if (mongoDatabase) {
       try {
-        const collections = {
-          users: Object.entries(safeDb.users || {}).map(([email, user]) => ({ _id: email, ...user })),
-          sessions: Object.entries(safeDb.sessions || {}).map(([token, session]) => ({ _id: token, ...(typeof session === 'string' ? { email: session } : { ...session, expiresAt: session.expiresAt ? new Date(session.expiresAt) : undefined }) })),
-          workflows: Object.entries(safeDb.workflows || {}).map(([id, workflow]) => ({ _id: id, ...workflow })),
-          notifications: Object.entries(safeDb.notifications || {}).map(([email, items]) => ({ _id: email, email, items })),
-          resetTokens: Object.entries(safeDb.resetTokens || {}).map(([token, value]) => ({ _id: token, ...value, expiresAt: value?.expiresAt ? new Date(value.expiresAt) : undefined })),
-          oauthStates: Object.entries(safeDb.oauthStates || {}).map(([state, value]) => ({ _id: state, ...value, expiresAt: value?.expiresAt ? new Date(value.expiresAt) : undefined })),
-        }
+        const collections = persistedCollections(safeDb)
+      const previousCollections = persistedCollections(mongoSnapshot)
         for (const [name, documents] of Object.entries(collections)) {
           const collection = mongoDatabase.collection(name)
-          const currentIds = documents.map((document) => document._id)
-          const previousIds = Object.keys(mongoSnapshot[name] || {})
-          const removedIds = previousIds.filter((id) => !currentIds.includes(id))
+          const currentById = new Map(documents.map((document) => [documentKey(document), document]))
+          const previousById = new Map((previousCollections[name] || []).map((document) => [documentKey(document), document]))
+
+          const removedIds = [...previousById.keys()].filter((id) => !currentById.has(id))
           if (removedIds.length) await collection.deleteMany({ _id: { $in: removedIds } })
-          if (documents.length) {
-            await collection.bulkWrite(documents.map((document) => ({ replaceOne: { filter: { _id: document._id }, replacement: document, upsert: true } })))
+
+          const changedDocuments = documents.filter((document) => !documentsEqual(document, previousById.get(documentKey(document))))
+          if (changedDocuments.length) {
+            await collection.bulkWrite(
+              changedDocuments.map((document) => ({
+                replaceOne: {
+                  filter: { _id: document._id },
+                  replacement: document,
+                  upsert: true,
+                },
+              })),
+              { ordered: false },
+            )
           }
         }
         mongoSnapshot = structuredClone(safeDb)
