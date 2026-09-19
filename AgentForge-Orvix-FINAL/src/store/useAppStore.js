@@ -166,6 +166,7 @@ function createSandboxEvaluation(workflow) {
 function getDefaultState() {
   return {
     isAuthenticated: false,
+    authHydrating: true,
     userName: 'User',
     userEmail: '',
     workflows: [],
@@ -589,6 +590,7 @@ export const useAppStore = create((set, get) => ({
     set((state) => ({
       ...state,
       isAuthenticated: false,
+      authHydrating: false,
       userEmail: '',
       userName: 'User',
       isNotificationsOpen: false,
@@ -601,16 +603,22 @@ export const useAppStore = create((set, get) => ({
   },
 
   async hydrateFromApi() {
-    if (!getApiToken()) return false
+    if (!getApiToken()) {
+      set({ authHydrating: false })
+      return false
+    }
+    set({ authHydrating: true })
     try {
       const response = await apiRequest('/me')
       set((state) => ({ ...state, isAuthenticated: true, userEmail: response.user.email, userName: response.user.name, workflows: (response.workflows || []).map(normalizeWorkflow), notifications: response.notifications || DEFAULT_NOTIFICATIONS, emailNotifications: response.user.emailNotifications !== false, lastError: null }))
       persistState(get())
+      set({ authHydrating: false })
       return true
     } catch {
       setApiToken(null)
       set((state) => ({ ...state, isAuthenticated: false, userEmail: '', userName: 'User', workflows: [], lastError: 'Your session expired. Please log in again.' }))
       persistState(get())
+      set({ authHydrating: false })
       return false
     }
   },
