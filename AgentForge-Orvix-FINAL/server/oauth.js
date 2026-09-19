@@ -4,6 +4,7 @@ import { existsSync, readFileSync } from 'node:fs'
 const GOOGLE_AUTH_URL = 'https://accounts.google.com/o/oauth2/v2/auth'
 const GOOGLE_TOKEN_URL = 'https://oauth2.googleapis.com/token'
 const GOOGLE_SCOPE = 'https://www.googleapis.com/auth/gmail.readonly'
+const GOOGLE_OAUTH_TIMEOUT_MS = 10000
 
 function loadEnvFile() {
   try {
@@ -123,7 +124,7 @@ export async function exchangeGoogleCode(code) {
   }
   const { clientId, clientSecret, redirectUri } = config()
   const controller = new AbortController()
-  const timeout = setTimeout(() => controller.abort(), 15000)
+  const timeout = setTimeout(() => controller.abort(), GOOGLE_OAUTH_TIMEOUT_MS)
   let response
   try { response = await fetch(GOOGLE_TOKEN_URL, { method: 'POST', headers: { 'content-type': 'application/x-www-form-urlencoded' }, signal: controller.signal, body: new URLSearchParams({ code, client_id: clientId, client_secret: clientSecret, redirect_uri: redirectUri, grant_type: 'authorization_code' }) }) } finally { clearTimeout(timeout) }
   if (!response.ok) throw new Error(`Google token exchange failed (${response.status})`)
