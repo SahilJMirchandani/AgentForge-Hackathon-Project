@@ -591,11 +591,10 @@ export const useAppStore = create((set, get) => ({
       lastError: null,
       lastNotice: null,
     }))
-    window.localStorage.setItem(STORAGE_KEY, JSON.stringify({
-      ...getDefaultState(),
-      users: get().users || {},
-      workflows: [],
-    }))
+    window.localStorage.removeItem(STORAGE_KEY)
+    window.localStorage.removeItem(ACCOUNTS_KEY)
+    sessionStorage.removeItem(SESSION_KEY)
+    window.localStorage.removeItem('agentforge-session-v1')
   },
 
   async hydrateFromApi() {
