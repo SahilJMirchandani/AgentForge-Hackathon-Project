@@ -9,6 +9,7 @@ export default function Layout() {
   const [mobileOpen, setMobileOpen] = useState(false)
   return (
     <div className="flex min-h-screen bg-canvas">
+      {mobileOpen && <button type="button" aria-label="Close navigation" onClick={() => setMobileOpen(false)} className="fixed inset-0 bg-black/20 z-30 lg:hidden" />}
       <Sidebar mobileOpen={mobileOpen} onClose={() => setMobileOpen(false)} />
       <div className="flex-1 flex flex-col min-w-0">
         <Topbar userName={userName} onMenu={() => setMobileOpen(true)} />
