@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import { Plus, Bot, Loader2 } from 'lucide-react'
 import { useAppStore } from '../store/useAppStore'
 import StatusBadge from '../components/StatusBadge'
@@ -55,12 +55,15 @@ function ActiveToggle({ active, onToggle }) {
 
 export default function Agents() {
   const navigate = useNavigate()
+  const [searchParams] = useSearchParams()
+  const query = (searchParams.get('search') || '').trim().toLowerCase()
   const workflows = useAppStore((s) => s.workflows)
   const toggleActive = useAppStore((s) => s.toggleActive)
   const deployWorkflow = useAppStore((s) => s.deployWorkflow)
   const [deployingId, setDeployingId] = useState(null)
   const [deployError, setDeployError] = useState('')
   const [deployMessage, setDeployMessage] = useState('')
+  const visibleWorkflows = query ? workflows.filter((w) => `${w.name || ''} ${w.prompt || ''}`.toLowerCase().includes(query)) : workflows
 
   async function handleDeploy(workflowId) {
     setDeployError('')
@@ -105,11 +108,11 @@ export default function Agents() {
             {deployMessage}
           </p>
         )}
-        {workflows.length === 0 ? (
+        {visibleWorkflows.length === 0 ? (
           <EmptyState />
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-            {workflows.map((w) => (
+            {visibleWorkflows.map((w) => (
               <div
                 key={w.id}
                 onClick={() => navigate(`/workflow/${w.id}`)}
