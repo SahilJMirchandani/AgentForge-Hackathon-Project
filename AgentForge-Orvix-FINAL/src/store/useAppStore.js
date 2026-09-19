@@ -312,7 +312,7 @@ function persistState(state) {
     const { password, ...safeAccount } = account || {}
     return [email, safeAccount]
   }))
-  pendingPersistSnapshot = {
+  const snapshot = {
     ...getDefaultState(),
     ...state,
     users: safeUsers,
@@ -320,11 +320,15 @@ function persistState(state) {
     workflows: state.workflows || [],
   }
 
-  // State changes such as React Flow node dragging can fire dozens of times
-  // per second. Debounce serialization and network synchronization so those
-  // UI events stay on the main thread.
+  // Local persistence must be immediate so logout/login, refresh, and crash
+  // recovery never race a debounce window. Only server synchronization is
+  // debounced.
+  window.localStorage.setItem(STORAGE_KEY, JSON.stringify(snapshot))
+  saveStoredAccounts(snapshot.users || {})
+  pendingPersistSnapshot = snapshot
+
   if (persistTimer) clearTimeout(persistTimer)
-  persistTimer = setTimeout(flushPersistState, 300)
+  persistTimer = setTimeout(flushPersistState, 150)
 }
 
 function readStoredState() {
