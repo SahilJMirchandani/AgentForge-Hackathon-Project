@@ -24,6 +24,7 @@ export default function Settings() {
   const [savingProfile, setSavingProfile] = useState(false)
   const [disconnectingGoogle, setDisconnectingGoogle] = useState(false)
   const [savingNotifications, setSavingNotifications] = useState(false)
+  const googleStatusTone = integrationStatus.toLowerCase().includes('connected') || integrationStatus.toLowerCase().includes('disconnected') ? 'success' : 'danger'
   const googleStatusRequest = useRef(null)
 
   useEffect(() => {
@@ -198,7 +199,7 @@ export default function Settings() {
           )}
         </div>
         {googleStatusLoading && <p className="mt-2 text-xs text-ink-faint">Loading connection status…</p>}
-        {integrationStatus && <p role="status" className="mt-2 text-xs text-danger">{integrationStatus}</p>}
+        {integrationStatus && <p role="status" className={`mt-2 text-xs ${googleStatusTone === 'success' ? 'text-success' : 'text-danger'}`}>{integrationStatus}</p>}
       </div>
 
       <div className="bg-surface border border-border rounded-card shadow-card p-6 mt-4 flex items-center justify-between gap-3">
