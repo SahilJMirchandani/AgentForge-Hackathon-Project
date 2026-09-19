@@ -3,6 +3,9 @@ import { Routes, Route } from 'react-router-dom'
 import Layout from './components/Layout'
 import RequireAuth from './components/RequireAuth'
 import Login from './pages/Login'
+import PublicHome from './pages/PublicHome'
+import PrivacyPolicy from './pages/PrivacyPolicy'
+import TermsOfService from './pages/TermsOfService'
 import Dashboard from './pages/Dashboard'
 import Templates from './pages/Templates'
 import Agents from './pages/Agents'
@@ -21,6 +24,9 @@ export default function App() {
 
   return (
     <Routes>
+      <Route path="/" element={<PublicHome />} />
+      <Route path="/privacy" element={<PrivacyPolicy />} />
+      <Route path="/terms" element={<TermsOfService />} />
       <Route path="/login" element={<Login />} />
       <Route
         element={
@@ -29,7 +35,7 @@ export default function App() {
           </RequireAuth>
         }
       >
-        <Route path="/" element={<Dashboard />} />
+        <Route path="/dashboard" element={<Dashboard />} />
         <Route path="/templates" element={<Templates />} />
         <Route path="/agents" element={<Agents />} />
         <Route path="/create" element={<CreateWorkflow />} />
