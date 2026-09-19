@@ -135,6 +135,11 @@ export async function executeWorkflow(workflow, user, input = {}) {
     if (run.steps.length) run.steps[run.steps.length - 1].status = 'Failed'
     workflow.nodes = (workflow.nodes || []).map((node) => ({ ...node, data: { ...node.data, status: node.id === failedNodeId ? 'failed' : node.data?.status } }))
     workflow.status = 'Failed'
+    workflow.results = [
+      { label: 'Run error', value: run.error },
+      { label: 'Latest available output', value: valueText(context) },
+    ]
+    run.output = context
     workflow.executionHistory = [{ id: run.id, status: run.status, startedAt, completedAt: run.completedAt, error: run.error }, ...(workflow.executionHistory || [])].slice(0, 50)
   }
 
