@@ -59,7 +59,7 @@ describe('Login page auth actions', () => {
   })
 
   it('restores saved workflows after logout and login with the same email', () => {
-    useAppStore.getState().signup('Ada Lovelace', 'ada@example.com', 'secret-pass')
+    useAppStore.getState().signupLocal('Ada Lovelace', 'ada@example.com', 'secret-pass')
     useAppStore.getState().generateWorkflow('Create a lead capture workflow')
     useAppStore.getState().logout()
     useAppStore.getState().login('ada@example.com', 'secret-pass')
