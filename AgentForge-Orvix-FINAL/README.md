@@ -34,8 +34,7 @@ Without `MONGODB_URI`, application data is stored in
 evaluation. Set `MONGODB_URI` and `MONGODB_DB` to use MongoDB persistence;
 `npm run migrate:mongodb` imports existing file data. SMTP settings enable
 real password-reset and agent-result emails; `TWILIO_ACCOUNT_SID`,
-`TWILIO_AUTH_TOKEN` and `TWILIO_FROM_NUMBER` enable SMS notifications. Google OAuth settings enable
-Gmail-connected agents, and Slack webhook URLs can be configured on output
+`TWILIO_AUTH_TOKEN` and `TWILIO_FROM_NUMBER` enable SMS notifications. Google OAuth settings enable Google sign-in, and Slack webhook URLs can be configured on output
 nodes. Set `OAUTH_ENCRYPTION_KEY` in production to protect provider tokens.
 Deployed agents with schedule triggers are executed by the server scheduler.
 Set `PORT`, `HOST`, `CLIENT_ORIGIN`, `API_PUBLIC_URL`, or `VITE_API_URL` to
@@ -49,7 +48,7 @@ single scheduler instance unless a distributed lock is added.
   password, show/hide password, and remember-me flows. Authentication uses the
   Node API with scrypt password hashing and bearer-token sessions. Every other route is guarded
   (`src/components/RequireAuth.jsx`), so opening the app starts here.
-- **Dashboard** (`/`) — stats, quick actions, recent workflows.
+- **Dashboard** (`/dashboard`) — stats, quick actions, recent workflows.
 - **Create Workflow** (`/create`) — the prompt box + example chips. With an
   authenticated API session, prompts wait for the backend to generate the
   actual agent graph with Gemini; deterministic templates remain available as
@@ -83,9 +82,7 @@ Gemini models your key can actually use and whether your Twilio number is
 SMS-capable. Run it after editing `.env`; a misconfiguration shows up here
 instead of surfacing later as a silently simulated notification.
 
-Google sign-in has a demo mode that skips the OAuth handshake entirely and
-returns a fixed account. It is only active when `ALLOW_DEMO_OAUTH=true`, and
-never in production.
+Google sign-in has a demo mode for local development that skips the OAuth handshake and returns a fixed account. It is only active when `ALLOW_DEMO_OAUTH=true`, and never in production.
 
 ## Notifications
 
@@ -131,8 +128,7 @@ execution, tokenized webhook deployment, sandbox scoring, execution history,
 notifications, profile updates, preferences, MongoDB persistence, SMTP email,
 and IP-based rate limiting. A deployed agent accepts `POST` JSON payloads at
 `/api/hooks/:token`; the token is shown in the workflow editor after deployment.
-Google OAuth uses `/api/integrations/google/connect` and requires the callback
-URL configured in Google Cloud Console to match `GOOGLE_REDIRECT_URI`.
+Google sign-in uses `/api/auth/google` and requires the callback URL configured in Google Cloud Console to match `GOOGLE_AUTH_REDIRECT_URI`.
 The frontend store synchronizes authenticated workflow mutations to the API.
 `GET /api/health` is a liveness check and `GET /api/ready` is the deployment
 readiness check. The Gemini, MongoDB, and SMTP credentials are read only by the
