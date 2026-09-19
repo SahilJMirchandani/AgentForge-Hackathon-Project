@@ -319,7 +319,7 @@ async function handle(req, res) {
         }
         delete db.oauthStates[stateKey]
         const token = tokenFor(normalized)
-        await saveDb(db)
+        saveDb(db).catch((error) => console.warn(`Google auth persistence warning: ${error.message}`))
         res.writeHead(302, { location: `${CLIENT_ORIGIN.replace(/\/$/, '')}/login?token=${encodeURIComponent(token)}` })
         return res.end()
       } catch (error) {
@@ -402,7 +402,7 @@ async function handle(req, res) {
     const user = requireUser(req, res); if (!user) return
     if (req.method === 'GET' && url.pathname === '/api/integrations') return json(res, 200, { google: { configured: googleConfigured(), connected: Boolean(user.googleOAuth) }, slack: { configured: true } })
     if (req.method === 'POST' && url.pathname === '/api/integrations/google/connect') { if (!googleConfigured()) return json(res, 503, { error: 'Google OAuth is not configured on the server' }); const state = randomBytes(24).toString('hex'); db.oauthStates[state] = { email: user.email, expiresAt: Date.now() + 10 * 60 * 1000 }; const authorizationUrl = googleAuthorizationUrl(state); saveDb(db).catch((error) => console.warn(`OAuth state persistence warning: ${error.message}`)); return json(res, 200, { url: authorizationUrl }, allowedOrigin, { 'set-cookie': `agentforge-google-state=${state}; HttpOnly; SameSite=Lax; Path=/api/integrations/google; Max-Age=600` }) }
-    if (req.method === 'DELETE' && url.pathname === '/api/integrations/google') { delete user.googleOAuth; await saveDb(db); return json(res, 200, { ok: true }) }
+    if (req.method === 'DELETE' && url.pathname === '/api/integrations/google') { delete user.googleOAuth; saveDb(db).catch((error) => console.warn(`Google disconnect persistence warning: ${error.message}`)); return json(res, 200, { ok: true }) }
     if (req.method === 'GET' && url.pathname === '/api/me') return json(res, 200, { user: publicUser(user), workflows: Object.values(db.workflows).filter((workflow) => workflow.userId === user.id).map(publicWorkflow), notifications: db.notifications[user.email] || [] })
     if (req.method === 'POST' && url.pathname === '/api/auth/logout') { const token = (req.headers.authorization || '').replace(/^Bearer\s+/i, ''); delete db.sessions[sessionKey(token)]; delete db.sessions[token]; saveDb(db).catch((error) => console.warn(`Logout persistence warning: ${error.message}`)); return json(res, 200, { ok: true }) }
     if (req.method === 'GET' && url.pathname === '/api/templates') return json(res, 200, { templates: Object.entries(TEMPLATES).map(([key, template]) => ({ key, name: template.name, nodes: template.nodes, edges: template.edges })) })
