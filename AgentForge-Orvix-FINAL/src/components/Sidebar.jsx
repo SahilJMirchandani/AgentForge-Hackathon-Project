@@ -1,5 +1,5 @@
 import { NavLink } from 'react-router-dom'
-import { Home, LayoutTemplate, Bot, History, Settings, Sparkles } from 'lucide-react'
+import { Home, LayoutTemplate, Bot, History, Settings, Sparkles, X } from 'lucide-react'
 
 const NAV_ITEMS = [
   { to: '/dashboard', label: 'Home', icon: Home, end: true },
@@ -9,14 +9,15 @@ const NAV_ITEMS = [
   { to: '/settings', label: 'Settings', icon: Settings },
 ]
 
-export default function Sidebar() {
+export default function Sidebar({ mobileOpen = false, onClose = () => {} }) {
   return (
-    <aside className="w-60 shrink-0 border-r border-border bg-surface flex flex-col h-screen sticky top-0">
+    <aside className={`w-60 shrink-0 border-r border-border bg-surface flex flex-col h-screen sticky top-0 z-40 ${mobileOpen ? "fixed left-0 top-0 bottom-0 shadow-xl" : "hidden lg:flex"}`}>
       <div className="h-16 flex items-center gap-2 px-5 border-b border-border">
         <div className="w-8 h-8 rounded-lg bg-primary flex items-center justify-center">
           <Sparkles size={16} className="text-white" />
         </div>
         <span className="font-semibold text-ink">AgentForge</span>
+        <button type="button" onClick={onClose} className="ml-auto lg:hidden text-ink-soft hover:text-ink" aria-label="Close menu"><X size={18} /></button>
       </div>
 
       <nav className="flex-1 px-3 py-4 flex flex-col gap-1">
