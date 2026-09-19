@@ -10,34 +10,81 @@ function getConfig() {
   }
 }
 
-async function generateJson(prompt, responseSchema) {
+const FALLBACK_MODEL = 'gemini-3.7-flash'
+const TRANSIENT_STATUSES = new Set([429, 500, 502, 503, 504])
+
+function sleep(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms))
+}
+
+async function requestGemini(body) {
   const { apiKey, model } = getConfig()
   if (!apiKey) return null
 
-  const controller = new AbortController()
-  const timeout = setTimeout(() => controller.abort(), Number(process.env.GEMINI_TIMEOUT_MS || 30000))
-  try {
-    const response = await fetch(`${API_ROOT}/${encodeURIComponent(model)}:generateContent`, {
-      method: 'POST',
-      headers: { 'content-type': 'application/json', 'x-goog-api-key': apiKey, 'x-goog-api-client': 'agentforge-orvix/1.0' },
-      signal: controller.signal,
-      body: JSON.stringify({
-        contents: [{ role: 'user', parts: [{ text: prompt }] }],
-        generationConfig: {
-          temperature: 0.2,
-          responseMimeType: 'application/json',
-          responseSchema,
-        },
-      }),
-    })
-    if (!response.ok) { const detail = await response.text().catch(() => ''); throw new Error(`Gemini request failed (${response.status})${detail ? `: ${detail.slice(0, 500)}` : ''}`) }
-    const payload = await response.json()
-    const text = payload.candidates?.[0]?.content?.parts?.map((part) => part.text || '').join('')
-    if (!text) throw new Error('Gemini returned no content')
-    return JSON.parse(text)
-  } finally {
-    clearTimeout(timeout)
+  const models = [...new Set([model, FALLBACK_MODEL])]
+  let lastError = null
+
+  for (const currentModel of models) {
+    const attempts = currentModel === model ? 2 : 1
+
+    for (let attempt = 0; attempt < attempts; attempt += 1) {
+      const controller = new AbortController()
+      const timeout = setTimeout(() => controller.abort(), Number(process.env.GEMINI_TIMEOUT_MS || 30000))
+
+      try {
+        const response = await fetch(`${API_ROOT}/${encodeURIComponent(currentModel)}:generateContent`, {
+          method: 'POST',
+          headers: { 'content-type': 'application/json', 'x-goog-api-key': apiKey, 'x-goog-api-client': 'agentforge-orvix/1.0' },
+          signal: controller.signal,
+          body: JSON.stringify(body),
+        })
+
+        if (response.ok) return response
+
+        const detail = await response.text().catch(() => '')
+        const error = new Error(`Gemini request failed (${response.status})${detail ? `: ${detail.slice(0, 500)}` : ''}`)
+        lastError = error
+
+        if (!TRANSIENT_STATUSES.has(response.status)) throw error
+        if (attempt < attempts - 1 || currentModel !== models[models.length - 1]) {
+          await sleep(500 * (attempt + 1))
+          continue
+        }
+        throw error
+      } catch (error) {
+        lastError = error
+        const transient = error?.name === 'AbortError' || /Gemini request failed \((429|500|502|503|504)\)/.test(error?.message || '')
+        if (!transient) throw error
+        if (attempt < attempts - 1 || currentModel !== models[models.length - 1]) {
+          await sleep(500 * (attempt + 1))
+          continue
+        }
+        throw error
+      } finally {
+        clearTimeout(timeout)
+      }
+    }
   }
+
+  throw lastError || new Error('Gemini request failed')
+}
+
+async function generateJson(prompt, responseSchema) {
+  const { apiKey } = getConfig()
+  if (!apiKey) return null
+
+  const response = await requestGemini({
+    contents: [{ role: 'user', parts: [{ text: prompt }] }],
+    generationConfig: {
+      temperature: 0.2,
+      responseMimeType: 'application/json',
+      responseSchema,
+    },
+  })
+  const payload = await response.json()
+  const text = payload.candidates?.[0]?.content?.parts?.map((part) => part.text || '').join('')
+  if (!text) throw new Error('Gemini returned no content')
+  return JSON.parse(text)
 }
 
 const workflowSchema = {
@@ -166,25 +213,16 @@ export function geminiStatus() {
 }
 
 async function generateText(prompt) {
-  const { apiKey, model } = getConfig()
+  const { apiKey } = getConfig()
   if (!apiKey) throw new Error('GEMINI_API_KEY is required for AI agent execution')
-  const controller = new AbortController()
-  const timeout = setTimeout(() => controller.abort(), Number(process.env.GEMINI_TIMEOUT_MS || 30000))
-  try {
-    const response = await fetch(`${API_ROOT}/${encodeURIComponent(model)}:generateContent`, {
-      method: 'POST',
-      headers: { 'content-type': 'application/json', 'x-goog-api-key': apiKey, 'x-goog-api-client': 'agentforge-orvix/1.0' },
-      signal: controller.signal,
-      body: JSON.stringify({ contents: [{ role: 'user', parts: [{ text: prompt }] }], generationConfig: { temperature: 0.2 } }),
-    })
-    if (!response.ok) { const detail = await response.text().catch(() => ''); throw new Error(`Gemini request failed (${response.status})${detail ? `: ${detail.slice(0, 500)}` : ''}`) }
-    const payload = await response.json()
-    const text = payload.candidates?.[0]?.content?.parts?.map((part) => part.text || '').join('').trim()
-    if (!text) throw new Error('Gemini returned no content')
-    return text
-  } finally {
-    clearTimeout(timeout)
-  }
+  const response = await requestGemini({
+    contents: [{ role: 'user', parts: [{ text: prompt }] }],
+    generationConfig: { temperature: 0.2 },
+  })
+  const payload = await response.json()
+  const text = payload.candidates?.[0]?.content?.parts?.map((part) => part.text || '').join('').trim()
+  if (!text) throw new Error('Gemini returned no content')
+  return text
 }
 
 export async function runAgentStep({ instructions, input, workflow }) {
