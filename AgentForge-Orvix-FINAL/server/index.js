@@ -333,16 +333,40 @@ async function handle(req, res) {
     if (req.method === 'GET' && url.pathname === '/api/integrations/google/callback') {
       const stateKey = url.searchParams.get('state')
       const state = db.oauthStates[stateKey]
-      if (!state || state.expiresAt <= Date.now()) return json(res, 400, { error: 'Google connection state is invalid or expired' }, allowedOrigin)
-      if (cookieValue(req, 'agentforge-google-state') !== stateKey) return json(res, 400, { error: 'Google connection state is invalid' }, allowedOrigin)
-      if (url.searchParams.get('error')) return json(res, 400, { error: 'Google connection was cancelled' }, allowedOrigin)
+      const settingsUrl = `${CLIENT_ORIGIN.replace(/\/$/, '')}/settings`
+      if (!state || state.expiresAt <= Date.now()) {
+        res.writeHead(302, { location: `${settingsUrl}?google=error&message=${encodeURIComponent('Google connection state expired. Please connect again.')}` })
+        return res.end()
+      }
+      if (cookieValue(req, 'agentforge-google-state') !== stateKey) {
+        res.writeHead(302, { location: `${settingsUrl}?google=error&message=${encodeURIComponent('Google connection state could not be verified. Please connect again.')}` })
+        return res.end()
+      }
+      if (url.searchParams.get('error')) {
+        res.writeHead(302, { location: `${settingsUrl}?google=cancelled` })
+        return res.end()
+      }
       const user = db.users[state.email]
-      if (!user) return json(res, 404, { error: 'Account not found' }, allowedOrigin)
-      user.googleOAuth = await exchangeGoogleCode(url.searchParams.get('code'))
-      delete db.oauthStates[url.searchParams.get('state')]
-      await saveDb(db)
-      res.writeHead(302, { location: `${CLIENT_ORIGIN.replace(/\/$/, '')}/settings?google=connected` })
-      return res.end()
+      if (!user) {
+        res.writeHead(302, { location: `${settingsUrl}?google=error&message=${encodeURIComponent('AgentForge account not found.')}` })
+        return res.end()
+      }
+      try {
+        const code = url.searchParams.get('code')
+        if (!code) throw new Error('Google authorization code missing')
+        user.googleOAuth = await exchangeGoogleCode(code)
+        delete db.oauthStates[stateKey]
+        saveDb(db).catch((error) => console.warn(`Google OAuth persistence warning: ${error.message}`))
+        res.writeHead(302, {
+          location: `${settingsUrl}?google=connected`,
+          'set-cookie': 'agentforge-google-state=; HttpOnly; SameSite=Lax; Path=/api/integrations/google; Max-Age=0',
+        })
+        return res.end()
+      } catch (error) {
+        console.error(`Google connection callback failed: ${error.message}`)
+        res.writeHead(302, { location: `${settingsUrl}?google=error&message=${encodeURIComponent(error.message || 'Google connection failed')}` })
+        return res.end()
+      }
     }
     if (['GET', 'POST'].includes(req.method) && parts[1] === 'hooks' && parts[2]) {
       const hookToken = parts[2]
