@@ -799,8 +799,7 @@ export const useAppStore = create((set, get) => ({
     // Render/Gemini should never block the editor opening. Create a usable
     // local template immediately, then let the server improve it in the background.
     return get().generateWorkflow(prompt)
-  }
-
+  },
 
   generateWorkflow(prompt) {
     const key = classifyPrompt(prompt) || (String(prompt || '').trim().length >= 8 ? 'email' : null)
