@@ -1,7 +1,5 @@
 import { randomUUID } from 'node:crypto'
 import { runAgentStep } from './gemini.js'
-import { accessTokenFor } from './oauth.js'
-import { fetchGmailMessages } from './integrations.js'
 import { deliverNotification, resolveChannel } from './notifications.js'
 
 const outputKinds = new Set(['output', 'notify'])
@@ -64,12 +62,8 @@ export async function executeWorkflow(workflow, user, input = {}) {
 
       if (node.data?.kind === 'trigger') {
         const triggerInstructions = instructions.toLowerCase()
-        if (/gmail/.test(triggerInstructions)) {
-          if (!user?.googleOAuth) throw new Error('Gmail integration is unavailable. Provide the email content as the run input instead.')
-          context = { input, messages: await fetchGmailMessages(await accessTokenFor(user)) }
-        } else {
-          context = input
-        }
+        if (/gmail/.test(triggerInstructions)) throw new Error('Gmail integration is unavailable. Provide the email content as the run input instead.')
+        context = input
       } else if (node.data?.kind === 'ai') {
         context = await runAgentStep({ instructions, input: context, workflow })
       } else if (node.data?.kind === 'condition') {
