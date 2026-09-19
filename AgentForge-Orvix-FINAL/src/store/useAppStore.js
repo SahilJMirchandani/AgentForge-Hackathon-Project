@@ -780,27 +780,11 @@ export const useAppStore = create((set, get) => ({
 
   // ---- Workflow creation ----------------------------------------------
   async createWorkflow(prompt) {
-    if (!getApiToken()) return get().generateWorkflow(prompt)
-    try {
-      const response = await apiRequest('/workflows', { method: 'POST', body: { prompt } })
-      if (!response.workflow) throw new Error('The server did not return an agent')
-      set((state) => ({
-        ...state,
-        workflows: [normalizeWorkflow(response.workflow), ...state.workflows.filter((workflow) => workflow.id !== response.workflow.id)],
-        notifications: response.notifications || state.notifications,
-        // Generation can silently fall back to a keyword template when the AI
-        // model is unavailable; say so rather than passing it off as AI output.
-        lastNotice: response.warning || null,
-        lastError: null,
-      }))
-      persistState(get())
-      return response.workflow.id
-    } catch (error) {
-      set({ lastError: error.message || 'Unable to create an agent' })
-      persistState(get())
-      return null
-    }
-  },
+    // Render/Gemini should never block the editor opening. Create a usable
+    // local template immediately, then let the server improve it in the background.
+    return get().generateWorkflow(prompt)
+  }
+
 
   generateWorkflow(prompt) {
     const key = classifyPrompt(prompt) || (String(prompt || '').trim().length >= 8 ? 'email' : null)
