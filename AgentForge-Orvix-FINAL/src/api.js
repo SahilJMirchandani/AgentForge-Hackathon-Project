@@ -23,7 +23,11 @@ function buildHeaders(options = {}) {
 
 export async function apiRequest(path, options = {}) {
   const controller = new AbortController()
-  const timeout = setTimeout(() => controller.abort(), options.timeoutMs || 15000)
+  // SMTP test notifications can take longer than normal API calls while the mail server
+  // completes its connection/handshake. Keep the normal 15s UI timeout, but allow the
+  // dedicated notification-test endpoint enough time to return a real SMTP error.
+  const requestTimeoutMs = options.timeoutMs || (path === '/notifications/test' ? 30000 : 15000)
+  const timeout = setTimeout(() => controller.abort(), requestTimeoutMs)
   const { timeoutMs, ...requestOptions } = options
   let response
   try {
