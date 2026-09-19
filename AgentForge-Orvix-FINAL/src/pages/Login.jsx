@@ -135,7 +135,7 @@ export default function Login() {
     } else {
       localStorage.removeItem('agentforge-session-v1')
     }
-    navigate('/')
+    navigate('/dashboard')
   }
 
   async function handleSignupSubmit(e) {
@@ -149,7 +149,7 @@ export default function Login() {
     } else {
       localStorage.removeItem('agentforge-session-v1')
     }
-    navigate('/')
+    navigate('/dashboard')
   }
 
   function handleResetSubmit(e) {
