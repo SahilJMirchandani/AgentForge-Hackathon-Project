@@ -6,6 +6,7 @@ import Login from './pages/Login'
 import PublicHome from './pages/PublicHome'
 import PrivacyPolicy from './pages/PrivacyPolicy'
 import TermsOfService from './pages/TermsOfService'
+import ErrorBoundary from './components/ErrorBoundary'
 import Dashboard from './pages/Dashboard'
 import Templates from './pages/Templates'
 import Agents from './pages/Agents'
@@ -23,7 +24,8 @@ export default function App() {
   }, [hydrateFromApi])
 
   return (
-    <Routes>
+    <ErrorBoundary>
+      <Routes>
       <Route path="/" element={<PublicHome />} />
       <Route path="/privacy" element={<PrivacyPolicy />} />
       <Route path="/terms" element={<TermsOfService />} />
@@ -43,6 +45,7 @@ export default function App() {
         <Route path="/history" element={<History />} />
         <Route path="/settings" element={<Settings />} />
       </Route>
-    </Routes>
+      </Routes>
+    </ErrorBoundary>
   )
 }
