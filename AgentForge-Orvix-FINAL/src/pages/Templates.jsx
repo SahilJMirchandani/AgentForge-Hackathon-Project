@@ -1,4 +1,6 @@
 import { useNavigate } from 'react-router-dom'
+import { useState } from 'react'
+import { Loader2 } from 'lucide-react'
 import { Mail, MessageSquare, TrendingUp, Calendar } from 'lucide-react'
 import { TEMPLATE_LIST } from '../data/templates'
 import { useAppStore } from '../store/useAppStore'
@@ -15,12 +17,17 @@ export default function Templates() {
   const navigate = useNavigate()
   const createWorkflow = useAppStore((s) => s.createWorkflow)
   const generateWorkflow = useAppStore((s) => s.generateWorkflow)
+  const [creatingKey, setCreatingKey] = useState(null)
 
   async function useTemplate(tpl) {
-    // Feed a prompt that maps back to this exact template so the
-    // generator picks it deterministically.
-    const id = (await createWorkflow(tpl.description)) || generateWorkflow(tpl.description)
-    if (id) navigate(`/workflow/${id}`)
+    if (creatingKey) return
+    setCreatingKey(tpl.key)
+    try {
+      const id = (await createWorkflow(tpl.description)) || generateWorkflow(tpl.description)
+      if (id) navigate(`/workflow/${id}`)
+    } finally {
+      setCreatingKey(null)
+    }
   }
 
   return (
@@ -39,10 +46,13 @@ export default function Templates() {
               <p className="text-sm font-semibold text-ink">{tpl.name}</p>
               <p className="text-xs text-ink-soft mt-1 leading-relaxed">{tpl.description}</p>
               <button
+                type="button"
                 onClick={() => useTemplate(tpl)}
-                className="mt-4 text-sm font-medium text-primary hover:underline"
+                disabled={Boolean(creatingKey)}
+                className="mt-4 inline-flex items-center gap-1.5 text-sm font-medium text-primary hover:underline disabled:cursor-not-allowed disabled:opacity-60"
               >
-                Use Template →
+                {creatingKey === tpl.key && <Loader2 size={14} className="animate-spin" />}
+                {creatingKey === tpl.key ? 'Opening…' : 'Use Template →'}
               </button>
             </div>
           )
