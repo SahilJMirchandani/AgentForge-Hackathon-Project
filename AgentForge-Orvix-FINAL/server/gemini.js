@@ -10,8 +10,9 @@ function getConfig() {
   }
 }
 
-const FALLBACK_MODELS = ['gemini-3.7-flash', 'gemini-3.6-flash', 'gemini-3.5-flash', 'gemini-2.5-flash']
+const FALLBACK_MODELS = ['gemini-3.7-flash', 'gemini-3.6-flash', 'gemini-3.5-flash', 'gemini-3.5-flash-lite', 'gemini-2.5-flash', 'gemini-2.5-flash-lite']
 const TRANSIENT_STATUSES = new Set([429, 500, 502, 503, 504])
+const MODEL_UNAVAILABLE_STATUSES = new Set([404])
 
 function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms))
@@ -47,7 +48,7 @@ async function requestGemini(body) {
         const error = new Error(`Gemini request failed (${response.status})${detail ? `: ${detail.slice(0, 500)}` : ''}`)
         lastError = error
 
-        if (!TRANSIENT_STATUSES.has(response.status)) throw error
+        if (!TRANSIENT_STATUSES.has(response.status) && !MODEL_UNAVAILABLE_STATUSES.has(response.status)) throw error
         if (attempt < attempts - 1 || currentModel !== models[models.length - 1]) {
           await sleep(500 * (attempt + 1))
           continue
@@ -55,7 +56,7 @@ async function requestGemini(body) {
         throw error
       } catch (error) {
         lastError = error
-        const transient = error?.name === 'AbortError' || /Gemini request failed \((429|500|502|503|504)\)/.test(error?.message || '')
+        const transient = error?.name === 'AbortError' || /Gemini request failed \((404|429|500|502|503|504)\)/.test(error?.message || '')
         if (!transient) throw error
         if (attempt < attempts - 1 || currentModel !== models[models.length - 1]) {
           await sleep(500 * (attempt + 1))
@@ -78,7 +79,6 @@ async function generateJson(prompt, responseSchema) {
   const response = await requestGemini({
     contents: [{ role: 'user', parts: [{ text: prompt }] }],
     generationConfig: {
-      temperature: 0.2,
       responseMimeType: 'application/json',
       responseSchema,
     },
@@ -219,7 +219,7 @@ async function generateText(prompt) {
   if (!apiKey) throw new Error('GEMINI_API_KEY is required for AI agent execution')
   const response = await requestGemini({
     contents: [{ role: 'user', parts: [{ text: prompt }] }],
-    generationConfig: { temperature: 0.2 },
+    generationConfig: {},
   })
   const payload = await response.json()
   const text = payload.candidates?.[0]?.content?.parts?.map((part) => part.text || '').join('').trim()
