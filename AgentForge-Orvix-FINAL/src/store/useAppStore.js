@@ -60,6 +60,18 @@ function notificationDefaults(prompt, data = {}) {
   return { channel, destination: String(data.destination || '').trim() || extractDestinationFromPrompt(prompt, channel) }
 }
 
+function workflowDefinitionFingerprint(workflow) {
+  if (!workflow) return ''
+  return JSON.stringify({
+    name: workflow.name || '',
+    prompt: workflow.prompt || '',
+    nodes: workflow.nodes || [],
+    edges: workflow.edges || [],
+    isActive: workflow.isActive !== false,
+    isDeployed: workflow.isDeployed === true,
+  })
+}
+
 function normalizeWorkflow(workflow) {
   const executionHistory = Array.isArray(workflow?.executionHistory)
     ? workflow.executionHistory
@@ -931,21 +943,39 @@ export const useAppStore = create((set, get) => ({
       return syncCurrentUser(nextState)
     })
     persistState(get())
+    const initialFingerprint = workflowDefinitionFingerprint(workflow)
     pendingServerCreations.add(id)
-    apiRequest('/workflows', { method: 'POST', body: { id, prompt } }).then((response) => {
+    apiRequest('/workflows', { method: 'POST', body: { id, prompt } }).then(async (response) => {
       pendingServerCreations.delete(id)
       if (!response.workflow) return
-      if (!get().getWorkflow(id)) {
-        apiRequest(`/workflows/${response.workflow.id}`, { method: 'DELETE', timeoutMs: 10000 }).catch(() => {})
+
+      const current = get().getWorkflow(id)
+      if (!current) {
+        await apiRequest(`/workflows/${response.workflow.id}`, { method: 'DELETE', timeoutMs: 10000 }).catch(() => {})
         return
       }
+
       const normalized = normalizeWorkflow(response.workflow)
+      const userEdited = workflowDefinitionFingerprint(current) !== initialFingerprint
+
+      if (userEdited) {
+        await apiRequest(`/workflows/${normalized.id}`, {
+          method: 'PATCH',
+          body: current,
+          timeoutMs: 10000,
+        }).then((saved) => {
+          const savedWorkflow = saved?.workflow ? normalizeWorkflow(saved.workflow) : current
+          lastServerWorkflowSnapshots.set(savedWorkflow.id, JSON.stringify(savedWorkflow))
+        }).catch(() => {})
+        return
+      }
+
       lastServerWorkflowSnapshots.set(normalized.id, JSON.stringify(normalized))
       set((state) => ({
         ...state,
-        workflows: response.workflow.id === id
-          ? state.workflows.map((current) => current.id === id ? normalized : current)
-          : [normalized, ...state.workflows.filter((current) => current.id !== id && current.id !== normalized.id)],
+        workflows: normalized.id === id
+          ? state.workflows.map((item) => item.id === id ? normalized : item)
+          : [normalized, ...state.workflows.filter((item) => item.id !== id && item.id !== normalized.id)],
         notifications: response.notifications || state.notifications,
       }))
       persistState(get())
