@@ -692,10 +692,14 @@ export const useAppStore = create((set, get) => ({
     return get().workflows.find((w) => w.id === id)
   },
 
-  deleteWorkflow(workflowId) {
+  async deleteWorkflow(workflowId) {
     const timer = workflowSyncTimers.get(workflowId)
     if (timer) clearTimeout(timer)
     workflowSyncTimers.delete(workflowId)
+
+    // Serialize any already-queued PATCH before issuing DELETE. This prevents
+    // an in-flight editor save from recreating the workflow after deletion.
+    const queuedSave = workflowSyncQueues.get(workflowId)
     workflowSyncQueues.delete(workflowId)
     pendingServerCreations.delete(workflowId)
 
@@ -718,9 +722,14 @@ export const useAppStore = create((set, get) => ({
       }
       return syncCurrentUser(nextState)
     })
-
-    apiRequest(`/workflows/${workflowId}`, { method: 'DELETE', timeoutMs: 10000 }).catch(() => {})
     persistState(get())
+
+    try {
+      if (queuedSave) await queuedSave.catch(() => {})
+      await apiRequest(`/workflows/${workflowId}`, { method: 'DELETE', timeoutMs: 10000 })
+    } catch {
+      // The UI remains deleted locally. A subsequent sync can reconcile the server.
+    }
   },
 
   updateWorkflowMeta(workflowId, updates) {
