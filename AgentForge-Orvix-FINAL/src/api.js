@@ -37,7 +37,7 @@ export async function apiRequest(path, options = {}) {
       })
     } catch (networkError) {
       if (networkError.name === 'AbortError') {
-        throw new Error('Request timed out. Please try again.')
+        throw new Error('The request is taking longer than expected. Please wait a moment and try again.')
       }
       const error = new Error('Backend server connection refused. Ensure the backend server is running (npm run dev).')
       error.status = 503
