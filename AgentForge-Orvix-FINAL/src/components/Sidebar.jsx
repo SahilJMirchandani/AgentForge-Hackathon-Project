@@ -2,7 +2,7 @@ import { NavLink } from 'react-router-dom'
 import { Home, LayoutTemplate, Bot, History, Settings, Sparkles } from 'lucide-react'
 
 const NAV_ITEMS = [
-  { to: '/', label: 'Home', icon: Home, end: true },
+  { to: '/dashboard', label: 'Home', icon: Home, end: true },
   { to: '/templates', label: 'Templates', icon: LayoutTemplate },
   { to: '/agents', label: 'My Agents', icon: Bot },
   { to: '/history', label: 'History', icon: History },
