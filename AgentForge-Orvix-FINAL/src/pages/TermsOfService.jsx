@@ -5,7 +5,7 @@ export default function TermsOfService() {
     <div className="min-h-screen bg-canvas text-ink">
       <header className="border-b border-border bg-surface">
         <div className="max-w-4xl mx-auto px-6 py-4 flex items-center justify-between">
-          <Link to="/home" className="font-semibold text-lg">AgentForge</Link>
+          <Link to="/" className="font-semibold text-lg">AgentForge</Link>
           <Link to="/login" className="text-sm text-primary font-medium hover:underline">Open AgentForge</Link>
         </div>
       </header>
@@ -26,7 +26,7 @@ export default function TermsOfService() {
           <section><h2 className="text-lg font-semibold text-ink">11. Contact</h2><p className="mt-2">For questions about these terms, contact the AgentForge service operator through the contact information provided with the application.</p></section>
         </div>
         <div className="mt-10 pt-5 border-t border-border flex gap-4 text-sm">
-          <Link to="/home" className="text-primary hover:underline">AgentForge home</Link>
+          <Link to="/" className="text-primary hover:underline">AgentForge home</Link>
           <Link to="/privacy" className="text-primary hover:underline">Privacy Policy</Link>
         </div>
       </main>
