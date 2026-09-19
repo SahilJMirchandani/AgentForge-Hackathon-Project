@@ -1090,7 +1090,7 @@ export const useAppStore = create((set, get) => ({
 
     if (getApiToken()) {
       try {
-        const response = await apiRequest(`/workflows/${workflowId}/run`, { method: 'POST', body: { input: input ?? workflow.prompt } })
+        const response = await apiRequest(`/workflows/${workflowId}/run`, { method: 'POST', body: { input: input ?? workflow.prompt }, timeoutMs: 90000 })
         if (response.workflow) {
           const normalized = normalizeWorkflow(response.workflow)
           lastServerWorkflowSnapshots.set(normalized.id, JSON.stringify(normalized))
