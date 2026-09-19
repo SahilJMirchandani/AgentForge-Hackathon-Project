@@ -12,7 +12,6 @@ const volatilePasswords = new Map()
 const workflowSyncQueues = new Map()
 const workflowSyncTimers = new Map()
 const pendingServerCreations = new Set()
-const workflowSyncTimers = new Map()
 function nextId(prefix) {
   return `${prefix}-${Date.now().toString(36)}-${Math.random().toString(36).substring(2, 7)}`
 }
