@@ -637,7 +637,7 @@ function NotificationFields({ data, onChange, accountEmail, workflowName }) {
       const response = await apiRequest('/notifications/test', {
         method: 'POST',
         body: { channel, destination, workflowName },
-        timeoutMs: 30000,
+        timeoutMs: 12000,
       })
       setTestState({ status: response.delivered ? 'sent' : 'simulated', message: response.message })
     } catch (error) {
