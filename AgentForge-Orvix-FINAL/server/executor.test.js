@@ -46,6 +46,16 @@ describe('agent executor', () => {
     expect(agent.executionHistory[0].id).toBe(run.id)
   })
 
+  it('reports a clear error when a Gmail trigger has no connected account', async () => {
+    const agent = workflow()
+    agent.nodes[0].data.instructions = 'When a new email arrives in Gmail.'
+    const run = await executeWorkflow(agent, { email: 'owner@example.com' }, 'email body')
+
+    expect(run.status).toBe('Failed')
+    expect(run.error).toMatch(/Gmail integration is unavailable/)
+    expect(agent.results[0].label).toBe('Run error')
+  })
+
   it('fails the run when an output side effect cannot be delivered', async () => {
     deliverNotification.mockResolvedValue({ delivered: false, simulated: false, channel: 'email', to: null, error: '"nope" is not a valid email address' })
     const agent = workflow()
