@@ -111,7 +111,7 @@ export default function CreateWorkflow() {
                 setPrompt(label)
                 handleGenerate(label)
               }}
-              className="px-3 py-1.5 rounded-full border border-border text-xs text-ink-soft hover:border-primary hover:text-primary transition-colors"
+              disabled={generating}\n              className="px-3 py-1.5 rounded-full border border-border text-xs text-ink-soft hover:border-primary hover:text-primary disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
             >
               {label}
             </button>
