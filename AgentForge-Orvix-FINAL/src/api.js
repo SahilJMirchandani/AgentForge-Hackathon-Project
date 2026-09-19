@@ -23,7 +23,7 @@ function buildHeaders(options = {}) {
 
 export async function apiRequest(path, options = {}) {
   const controller = new AbortController()
-  const timeout = setTimeout(() => controller.abort(), options.timeoutMs || 20000)
+  const timeout = setTimeout(() => controller.abort(), options.timeoutMs || 15000)
   const { timeoutMs, ...requestOptions } = options
   let response
   try {
