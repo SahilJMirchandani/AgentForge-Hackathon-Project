@@ -12,7 +12,7 @@ export default function Settings() {
   const emailNotifications = useAppStore((s) => s.emailNotifications)
   const setEmailNotifications = useAppStore((s) => s.setEmailNotifications)
   const navigate = useNavigate()
-  const [savedLoginStatus, setSavedLoginStatus] = useState('Saved session active')
+  const [savedLoginStatus, setSavedLoginStatus] = useState('')
   const [isEditingProfile, setIsEditingProfile] = useState(false)
   const [nameDraft, setNameDraft] = useState(userName)
   const [emailDraft, setEmailDraft] = useState(userEmail)
@@ -55,7 +55,8 @@ export default function Settings() {
 
   function handleForgetSavedLogin() {
     clearSavedSession()
-    setSavedLoginStatus('Saved session cleared')
+    setSavedLoginStatus('Saved login cleared. You have been signed out.')
+    navigate('/login', { replace: true })
   }
 
   async function handleGoogleConnect() {
