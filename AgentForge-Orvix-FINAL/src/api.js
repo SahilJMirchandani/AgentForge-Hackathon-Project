@@ -31,7 +31,7 @@ export async function apiRequest(path, options = {}) {
       response = await fetch(getApiUrl(path), {
         ...requestOptions,
         credentials: requestOptions.credentials || 'include',
-        signal: requestOptions.signal || controller.signal,
+        signal: controller.signal,
         headers: buildHeaders(requestOptions),
         body: requestOptions.body && typeof requestOptions.body !== 'string' ? JSON.stringify(requestOptions.body) : requestOptions.body,
       })
