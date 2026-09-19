@@ -33,7 +33,7 @@ export default function PublicHome() {
             <Link to="/login" className="inline-flex items-center gap-2 px-5 py-2.5 rounded-control bg-primary text-white text-sm font-medium hover:bg-primary-hover">
               Try AgentForge <ArrowRight size={15} />
             </Link>
-            <a href="#privacy" className="inline-flex items-center px-5 py-2.5 rounded-control border border-border bg-surface text-sm font-medium text-ink-soft hover:text-ink">
+            <a href="/privacy" className="inline-flex items-center px-5 py-2.5 rounded-control border border-border bg-surface text-sm font-medium text-ink-soft hover:text-ink">
               Privacy & data use
             </a>
           </div>
@@ -53,15 +53,12 @@ export default function PublicHome() {
           ))}
         </section>
 
-        <section id="privacy" className="mt-14 bg-surface border border-border rounded-card p-6">
-          <h2 className="text-base font-semibold">Google data use</h2>
+        <section className="mt-14 bg-surface border border-border rounded-card p-6">
+          <h2 className="text-base font-semibold">Privacy & security</h2>
           <p className="mt-2 text-sm text-ink-soft leading-6">
-            AgentForge can optionally connect to Google Gmail so a user-requested workflow can read Gmail messages. Gmail access is requested only when the user chooses to connect Google. See our
+            AgentForge uses your account, workflow, run, and notification data to provide the features you request. Review the
             {' '}<Link to="/privacy" className="text-primary font-medium hover:underline">Privacy Policy</Link>
-            {' '}for details, including how Google data is accessed, protected, used, and deleted.
-          </p>
-          <p className="mt-2 text-sm text-ink-soft leading-6">
-            AgentForge does not sell Google user data or use it for advertising, and Google data is not used to train a general-purpose AI model. Google Workspace data is handled in accordance with applicable Google API user-data and Limited Use requirements.
+            {' '}for details about data handling and third-party services.
           </p>
         </section>
       </main>
