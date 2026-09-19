@@ -10,7 +10,17 @@ function getConfig() {
   }
 }
 
-const FALLBACK_MODELS = ['gemini-3.7-flash', 'gemini-3.6-flash', 'gemini-3.5-flash', 'gemini-3.5-flash-lite', 'gemini-2.5-flash', 'gemini-2.5-flash-lite']
+const FALLBACK_MODELS = [
+  'gemini-3.7-flash',
+  'gemini-3.6-flash',
+  'gemini-3.5-flash',
+  'gemini-3.5-flash-lite',
+  'gemini-3.1-flash-lite',
+  'gemini-2.5-flash',
+  'gemini-2.5-flash-lite',
+  'gemini-flash-latest',
+  'gemini-flash-lite-latest',
+]
 const TRANSIENT_STATUSES = new Set([429, 500, 502, 503, 504])
 const MODEL_UNAVAILABLE_STATUSES = new Set([404])
 
@@ -31,7 +41,7 @@ async function requestGemini(body) {
     for (let attempt = 0; attempt < attempts; attempt += 1) {
       const controller = new AbortController()
       const configuredTimeout = Number(process.env.GEMINI_TIMEOUT_MS || 30000)
-      const timeoutMs = Math.min(Math.max(configuredTimeout, 5000), 12000)
+      const timeoutMs = Math.min(Math.max(configuredTimeout, 5000), 10000)
       const timeout = setTimeout(() => controller.abort(), timeoutMs)
 
       try {
