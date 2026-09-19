@@ -22,6 +22,8 @@ export default function Settings() {
   const [googleConnecting, setGoogleConnecting] = useState(false)
   const [integrationStatus, setIntegrationStatus] = useState('')
   const [savingProfile, setSavingProfile] = useState(false)
+  const [disconnectingGoogle, setDisconnectingGoogle] = useState(false)
+  const [savingNotifications, setSavingNotifications] = useState(false)
   const googleStatusRequest = useRef(null)
 
   useEffect(() => {
@@ -73,12 +75,16 @@ export default function Settings() {
   }
 
   async function handleGoogleDisconnect() {
+    if (disconnectingGoogle) return
+    setDisconnectingGoogle(true)
     try {
-      await apiRequest('/integrations/google', { method: 'DELETE' })
+      await apiRequest('/integrations/google', { method: 'DELETE', timeoutMs: 10000 })
       setGoogleConnected(false)
       setIntegrationStatus('Google disconnected.')
     } catch (error) {
       setIntegrationStatus(error.message || 'Unable to disconnect Google.')
+    } finally {
+      setDisconnectingGoogle(false)
     }
   }
 
@@ -88,9 +94,9 @@ export default function Settings() {
       <p className="text-sm text-ink-soft mt-1">Manage your account and preferences.</p>
 
       <div className="bg-surface border border-border rounded-card shadow-card p-6 mt-6 space-y-5">
-        <div className="rounded-control border border-success/30 bg-success-light px-3 py-2 text-xs text-success font-medium">
+        {savedLoginStatus && <div className="rounded-control border border-success/30 bg-success-light px-3 py-2 text-xs text-success font-medium">
           {savedLoginStatus}
-        </div>
+        </div>}
         {!isEditingProfile ? (
           <>
             <div>
@@ -155,8 +161,13 @@ export default function Settings() {
             <input
               type="checkbox"
               checked={emailNotifications}
-              onChange={(e) => setEmailNotifications(e.target.checked)}
-              className="accent-primary w-4 h-4"
+              disabled={savingNotifications}
+              onChange={async (e) => {
+                setSavingNotifications(true)
+                await setEmailNotifications(e.target.checked)
+                setSavingNotifications(false)
+              }}
+              className="accent-primary w-4 h-4 disabled:opacity-50"
             />
             <span className="text-sm text-ink">Notify me when an agent finishes running</span>
           </div>
@@ -172,7 +183,9 @@ export default function Settings() {
             <p className="text-xs text-ink-soft mt-0.5">Read-only access for email-triggered agents.</p>
           </div>
           {googleConnected ? (
-            <button type="button" onClick={handleGoogleDisconnect} className="px-3 py-2 rounded-control border border-danger/30 text-xs font-medium text-danger hover:bg-danger-light">Disconnect</button>
+            <button type="button" onClick={handleGoogleDisconnect} disabled={disconnectingGoogle} className="px-3 py-2 rounded-control border border-danger/30 text-xs font-medium text-danger hover:bg-danger-light disabled:opacity-60">
+              {disconnectingGoogle ? 'Disconnecting…' : 'Disconnect'}
+            </button>
           ) : (
             <button
               type="button"
