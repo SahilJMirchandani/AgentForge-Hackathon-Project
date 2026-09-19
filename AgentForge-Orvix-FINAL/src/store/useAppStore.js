@@ -240,29 +240,23 @@ function syncCurrentUser(state) {
   }
 }
 
-function persistState(state) {
-  if (typeof window === 'undefined') return
+let persistTimer = null
+let pendingPersistSnapshot = null
 
-  const safeUsers = Object.fromEntries(Object.entries(state.users || {}).map(([email, account]) => {
-    const { password, ...safeAccount } = account || {}
-    return [email, safeAccount]
-  }))
-  const snapshot = {
-    ...getDefaultState(),
-    ...state,
-    users: safeUsers,
-    notifications: state.notifications || DEFAULT_NOTIFICATIONS,
-    workflows: state.workflows || [],
+function flushPersistState() {
+  if (persistTimer) {
+    clearTimeout(persistTimer)
+    persistTimer = null
   }
+  if (!pendingPersistSnapshot) return
+  const snapshot = pendingPersistSnapshot
+  pendingPersistSnapshot = null
 
   window.localStorage.setItem(STORAGE_KEY, JSON.stringify(snapshot))
   saveStoredAccounts(snapshot.users || {})
 
   if (!getApiToken() || !snapshot.userEmail) return
 
-  // Local storage is immediate. Server persistence is deliberately debounced so
-  // dragging nodes, typing, or toggling controls does not create a network
-  // request for every single state update.
   snapshot.workflows.forEach((workflow) => {
     const existingTimer = workflowSyncTimers.get(workflow.id)
     if (existingTimer) clearTimeout(existingTimer)
@@ -285,6 +279,28 @@ function persistState(state) {
 
     workflowSyncTimers.set(workflow.id, timer)
   })
+}
+
+function persistState(state) {
+  if (typeof window === 'undefined') return
+
+  const safeUsers = Object.fromEntries(Object.entries(state.users || {}).map(([email, account]) => {
+    const { password, ...safeAccount } = account || {}
+    return [email, safeAccount]
+  }))
+  pendingPersistSnapshot = {
+    ...getDefaultState(),
+    ...state,
+    users: safeUsers,
+    notifications: state.notifications || DEFAULT_NOTIFICATIONS,
+    workflows: state.workflows || [],
+  }
+
+  // State changes such as React Flow node dragging can fire dozens of times
+  // per second. Debounce serialization and network synchronization so those
+  // UI events stay on the main thread.
+  if (persistTimer) clearTimeout(persistTimer)
+  persistTimer = setTimeout(flushPersistState, 300)
 }
 
 function readStoredState() {
