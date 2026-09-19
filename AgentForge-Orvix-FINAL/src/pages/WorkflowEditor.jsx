@@ -99,7 +99,7 @@ export default function WorkflowEditor() {
     return (
       <div className="max-w-2xl mx-auto text-center py-20">
         <p className="text-ink-soft">Workflow not found.</p>
-        <Link to="/" className="text-primary text-sm font-medium hover:underline mt-2 inline-block">
+        <Link to="/agents" className="text-primary text-sm font-medium hover:underline mt-2 inline-block">
           Back to dashboard
         </Link>
       </div>
@@ -423,11 +423,29 @@ function Field({ label, value, onChange, multiline = false, placeholder }) {
 }
 
 function WebhookPanel({ token }) {
+  const [copied, setCopied] = useState(false)
   const configuredApiUrl = getApiUrl(`/hooks/${token}`)
   const webhookUrl = /^https?:\/\//.test(configuredApiUrl) ? configuredApiUrl : `${window.location.origin}${configuredApiUrl}`
 
-  function copyUrl() {
-    navigator.clipboard?.writeText(webhookUrl)
+  async function copyUrl() {
+    try {
+      if (navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(webhookUrl)
+      } else {
+        const textarea = document.createElement('textarea')
+        textarea.value = webhookUrl
+        textarea.style.position = 'fixed'
+        textarea.style.opacity = '0'
+        document.body.appendChild(textarea)
+        textarea.select()
+        document.execCommand('copy')
+        textarea.remove()
+      }
+      setCopied(true)
+      window.setTimeout(() => setCopied(false), 1400)
+    } catch {
+      setCopied(false)
+    }
   }
 
   return (
@@ -440,7 +458,7 @@ function WebhookPanel({ token }) {
           <div className="mt-2 flex items-center gap-2">
             <code className="min-w-0 flex-1 truncate rounded-control bg-surface px-2.5 py-2 text-xs text-ink">{webhookUrl}</code>
             <button type="button" onClick={copyUrl} aria-label="Copy webhook URL" className="inline-flex h-8 w-8 items-center justify-center rounded-control border border-border bg-surface text-ink-soft hover:text-primary">
-              <Copy size={14} />
+              {copied ? <CheckCircle2 size={14} /> : <Copy size={14} />}
             </button>
           </div>
         </div>
