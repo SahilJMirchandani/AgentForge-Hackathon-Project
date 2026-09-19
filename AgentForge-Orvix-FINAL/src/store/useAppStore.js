@@ -586,31 +586,6 @@ export const useAppStore = create((set, get) => ({
     } catch {}
     set({ ...getDefaultState(), isAuthenticated: false })
   },
-      })
-    }
-
-    setApiToken(null)
-    saveStoredSession(null)
-    if (persistTimer) {
-      clearTimeout(persistTimer)
-      persistTimer = null
-    }
-    pendingPersistSnapshot = null
-    window.localStorage.removeItem(STORAGE_KEY)
-    set((state) => ({
-      ...state,
-      isAuthenticated: false,
-      authHydrating: false,
-      userEmail: '',
-      userName: 'User',
-      workflows: [],
-      notifications: DEFAULT_NOTIFICATIONS,
-      isNotificationsOpen: false,
-      lastError: null,
-      lastNotice: null,
-    }))
-    apiRequest('/auth/logout', { method: 'POST', timeoutMs: 5000 }).catch(() => {})
-  },
 
 
   clearSavedSession() {
