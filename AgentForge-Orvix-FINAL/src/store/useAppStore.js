@@ -31,7 +31,7 @@ function processNode(node, previousOutput) {
       const instructions = node.data?.instructions?.trim() || node.data?.subtitle || 'Complete this step.'
       const context = previousOutput ? ' after using the previous step result' : ''
       resolve(`${node.data?.title || 'Node'} completed: ${instructions}${context}`)
-    }, 450)
+    }, 100)
   })
 }
 
@@ -582,6 +582,10 @@ export const useAppStore = create((set, get) => ({
       clearTimeout(persistTimer)
       persistTimer = null
     }
+    window.localStorage.removeItem(STORAGE_KEY)
+    window.localStorage.removeItem(SESSION_KEY)
+    sessionStorage.removeItem(SESSION_KEY)
+    window.localStorage.removeItem('agentforge-session-v1')
     set((state) => ({
       ...state,
       isAuthenticated: false,
@@ -592,7 +596,6 @@ export const useAppStore = create((set, get) => ({
       lastNotice: null,
     }))
     window.localStorage.removeItem(STORAGE_KEY)
-    window.localStorage.removeItem(ACCOUNTS_KEY)
     sessionStorage.removeItem(SESSION_KEY)
     window.localStorage.removeItem('agentforge-session-v1')
   },
@@ -833,22 +836,11 @@ export const useAppStore = create((set, get) => ({
     }
   },
 
-  runSandboxEval(workflowId) {
+  async runSandboxEval(workflowId) {
     const workflow = get().getWorkflow(workflowId)
-    if (!workflow) return
+    if (!workflow) return null
 
-    if (getApiToken()) {
-      apiRequest(`/workflows/${workflowId}/sandbox`, { method: 'POST' }).then((response) => {
-        if (!response.workflow) return
-        const normalized = normalizeWorkflow(response.workflow)
-        lastServerWorkflowSnapshots.set(normalized.id, JSON.stringify(normalized))
-        set((state) => ({ ...state, workflows: state.workflows.map((current) => current.id === workflowId ? normalized : current), notifications: response.notifications || state.notifications }))
-        persistState(get())
-      }).catch(() => {})
-    }
-
-    if (!getApiToken()) setTimeout(() => {
-      const evaluation = createSandboxEvaluation(workflow)
+    const applyEvaluation = (evaluation, source) => {
       const instructionSummary = workflow.nodes
         .map((node) => node.data?.instructions)
         .filter(Boolean)
@@ -866,18 +858,36 @@ export const useAppStore = create((set, get) => ({
           ...state,
           workflows: state.workflows.map((w) => (
             w.id === workflowId
-              ? {
-                  ...w,
-                  sandboxScore: evaluation.score,
-                  sandboxTests,
-                }
+              ? { ...w, sandboxScore: evaluation.score, sandboxTests, sandboxSource: source }
               : w
           )),
         }
         return syncCurrentUser(nextState)
       })
       persistState(get())
-    }, 1200)
+    }
+
+    if (getApiToken()) {
+      try {
+        const response = await apiRequest(`/workflows/${workflowId}/sandbox`, { method: 'POST', timeoutMs: 20000 })
+        if (!response.workflow) return response
+        const normalized = normalizeWorkflow(response.workflow)
+        lastServerWorkflowSnapshots.set(normalized.id, JSON.stringify(normalized))
+        set((state) => ({
+          ...state,
+          workflows: state.workflows.map((current) => current.id === workflowId ? normalized : current),
+          notifications: response.notifications || state.notifications,
+        }))
+        persistState(get())
+        return response
+      } catch {
+        // Use the local evaluator immediately if the server evaluator is unavailable.
+      }
+    }
+
+    const evaluation = createSandboxEvaluation(workflow)
+    applyEvaluation(evaluation, 'heuristic')
+    return { workflow: get().getWorkflow(workflowId), sandboxSource: 'heuristic' }
   },
 
   // ---- Workflow creation ----------------------------------------------
