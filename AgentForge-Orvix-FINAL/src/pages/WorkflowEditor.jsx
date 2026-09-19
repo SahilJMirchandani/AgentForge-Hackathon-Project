@@ -140,7 +140,7 @@ export default function WorkflowEditor() {
   function handleDelete() {
     if (!window.confirm(`Delete "${workflow.name}"? This cannot be undone.`)) return
     deleteWorkflow(id)
-    navigate('/')
+    navigate('/agents')
   }
 
   function handleBack() {
