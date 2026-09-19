@@ -320,7 +320,7 @@ async function handle(req, res) {
         delete db.oauthStates[stateKey]
         const token = tokenFor(normalized)
         await saveDb(db)
-        res.writeHead(302, { location: `${CLIENT_ORIGIN.replace(/\/$/, '')}/login?token=${encodeURIComponent(token)}` })
+        res.writeHead(302, { location: `${CLIENT_ORIGIN.replace(/\/$/, '')}/dashboard` })
         return res.end()
       } catch (error) {
         console.error(`Google Auth Callback Error: ${error.message}`)
