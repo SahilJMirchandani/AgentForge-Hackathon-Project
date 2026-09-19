@@ -25,6 +25,12 @@ export default function Settings() {
   const googleStatusRequest = useRef(null)
 
   useEffect(() => {
+    const params = new URLSearchParams(window.location.search)
+    const googleResult = params.get('google')
+    if (googleResult === 'connected') setIntegrationStatus('Google Gmail connected successfully.')
+    if (googleResult === 'cancelled') setIntegrationStatus('Google connection was cancelled.')
+    if (googleResult === 'error') setIntegrationStatus(params.get('message') || 'Google connection failed. Please connect again.')
+
     googleStatusRequest.current = apiRequest('/integrations').then((response) => {
       setGoogleConnected(response.google?.connected === true)
       setGoogleConfigured(response.google?.configured === true)
