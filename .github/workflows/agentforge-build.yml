@@ -1,6 +1,8 @@
 name: AgentForge Build Verification
 
 on:
+  push:
+    branches: [ main ]
   pull_request:
     paths:
       - 'AgentForge-Orvix-FINAL/**'
