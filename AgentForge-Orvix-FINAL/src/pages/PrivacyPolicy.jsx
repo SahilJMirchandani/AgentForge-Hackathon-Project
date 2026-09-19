@@ -5,7 +5,7 @@ export default function PrivacyPolicy() {
     <div className="min-h-screen bg-canvas text-ink">
       <header className="border-b border-border bg-surface">
         <div className="max-w-4xl mx-auto px-6 py-4 flex items-center justify-between">
-          <Link to="/home" className="font-semibold text-lg">AgentForge</Link>
+          <Link to="/" className="font-semibold text-lg">AgentForge</Link>
           <Link to="/login" className="text-sm text-primary font-medium hover:underline">Open AgentForge</Link>
         </div>
       </header>
@@ -38,7 +38,7 @@ export default function PrivacyPolicy() {
         </div>
 
         <div className="mt-10 pt-5 border-t border-border flex gap-4 text-sm">
-          <Link to="/home" className="text-primary hover:underline">AgentForge home</Link>
+          <Link to="/" className="text-primary hover:underline">AgentForge home</Link>
           <Link to="/terms" className="text-primary hover:underline">Terms of Service</Link>
         </div>
       </main>
