@@ -61,22 +61,9 @@ export default function Settings() {
   async function handleGoogleConnect() {
     setIntegrationStatus('')
     setGoogleConnecting(true)
-    let configured = googleConfigured
-    if (googleStatusLoading && googleStatusRequest.current) {
-      try {
-        const response = await googleStatusRequest.current
-        configured = response.google?.configured === true
-      } catch {
-        configured = false
-      }
-    }
-    if (!configured) {
-      setGoogleConnecting(false)
-      setIntegrationStatus('Google sign-in setup is required for this workspace.')
-      return
-    }
     try {
-      const response = await apiRequest('/integrations/google/connect', { method: 'POST' })
+      const response = await apiRequest('/integrations/google/connect', { method: 'POST', timeoutMs: 10000 })
+      if (!response.url) throw new Error('Google connection could not be started.')
       window.location.assign(response.url)
     } catch (error) {
       setIntegrationStatus(error.message || 'Unable to start Google connection.')
@@ -211,7 +198,7 @@ export default function Settings() {
             onClick={handleForgetSavedLogin}
             className="px-4 py-2.5 rounded-control border border-border text-sm font-medium text-ink hover:bg-canvas transition-colors"
           >
-            Forget saved login
+            Forget saved login & sign out
           </button>
           <button
             onClick={handleLogout}
