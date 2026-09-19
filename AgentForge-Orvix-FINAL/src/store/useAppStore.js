@@ -197,11 +197,15 @@ function getStoredAccounts() {
 
 function saveStoredAccounts(accounts) {
   if (typeof window === 'undefined') return
-  const safeAccounts = Object.fromEntries(Object.entries(accounts || {}).map(([email, account]) => {
-    const { password, ...safeAccount } = account || {}
-    return [email, safeAccount]
-  }))
-  window.localStorage.setItem(ACCOUNTS_KEY, JSON.stringify(safeAccounts))
+  try {
+    const safeAccounts = Object.fromEntries(Object.entries(accounts || {}).map(([email, account]) => {
+      const { password, ...safeAccount } = account || {}
+      return [email, safeAccount]
+    }))
+    window.localStorage.setItem(ACCOUNTS_KEY, JSON.stringify(safeAccounts))
+  } catch {
+    // Storage can be unavailable/full in private or constrained browser modes.
+  }
 }
 
 function getStoredSession() {
@@ -218,12 +222,16 @@ function getStoredSession() {
 
 function saveStoredSession(session) {
   if (typeof window === 'undefined') return
-  if (!session) {
-    window.localStorage.removeItem(SESSION_KEY)
-    return
+  try {
+    if (!session) {
+      window.localStorage.removeItem(SESSION_KEY)
+      return
+    }
+    const { password, ...safeSession } = session
+    window.localStorage.setItem(SESSION_KEY, JSON.stringify(safeSession))
+  } catch {
+    // Treat persistence as optional; authentication itself remains functional.
   }
-  const { password, ...safeSession } = session
-  window.localStorage.setItem(SESSION_KEY, JSON.stringify(safeSession))
 }
 
 function syncCurrentUser(state) {
@@ -267,8 +275,12 @@ function flushPersistState() {
   const snapshot = pendingPersistSnapshot
   pendingPersistSnapshot = null
 
-  window.localStorage.setItem(STORAGE_KEY, JSON.stringify(snapshot))
-  saveStoredAccounts(snapshot.users || {})
+  try {
+    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(snapshot))
+    saveStoredAccounts(snapshot.users || {})
+  } catch {
+    // Never let a storage/quota failure freeze or crash a button action.
+  }
 
   if (!getApiToken() || !snapshot.userEmail) return
 
@@ -561,21 +573,46 @@ export const useAppStore = create((set, get) => ({
   },
 
   logout() {
-    set((state) => {
-      const nextState = {
-        ...state,
-        isAuthenticated: false,
-        userEmail: '',
-        userName: 'User',
-        isNotificationsOpen: false,
-      }
-      return syncCurrentUser(nextState)
-    })
-    saveStoredSession(null)
-    apiRequest('/auth/logout', { method: 'POST' }).catch(() => {})
+    const currentEmail = get().userEmail
+    const currentAccountWorkflows = get().workflows || []
+    const currentNotifications = get().notifications || DEFAULT_NOTIFICATIONS
+    if (currentEmail) {
+      const accounts = getStoredAccounts()
+      saveStoredAccounts({
+        ...accounts,
+        [currentEmail]: {
+          ...(accounts[currentEmail] || {}),
+          name: get().userName || accounts[currentEmail]?.name || 'User',
+          workflows: currentAccountWorkflows,
+          notifications: currentNotifications,
+          emailNotifications: get().emailNotifications !== false,
+        },
+      })
+    }
+
     setApiToken(null)
-    persistState(get())
+    saveStoredSession(null)
+    if (persistTimer) {
+      clearTimeout(persistTimer)
+      persistTimer = null
+    }
+    pendingPersistSnapshot = null
+    window.localStorage.removeItem(STORAGE_KEY)
+    set((state) => ({
+      ...state,
+      isAuthenticated: false,
+      authHydrating: false,
+      userEmail: '',
+      userName: 'User',
+      workflows: [],
+      notifications: DEFAULT_NOTIFICATIONS,
+      isNotificationsOpen: false,
+      lastError: null,
+      lastNotice: null,
+    }))
+    apiRequest('/auth/logout', { method: 'POST', timeoutMs: 5000 }).catch(() => {})
   },
+
 
   clearSavedSession() {
     const token = getApiToken()
@@ -587,10 +624,12 @@ export const useAppStore = create((set, get) => ({
       clearTimeout(persistTimer)
       persistTimer = null
     }
-    window.localStorage.removeItem(STORAGE_KEY)
-    window.localStorage.removeItem(SESSION_KEY)
-    sessionStorage.removeItem(SESSION_KEY)
-    window.localStorage.removeItem('agentforge-session-v1')
+    try {
+      window.localStorage.removeItem(STORAGE_KEY)
+      window.localStorage.removeItem(SESSION_KEY)
+      sessionStorage.removeItem(SESSION_KEY)
+      window.localStorage.removeItem('agentforge-session-v1')
+    } catch {}
     set((state) => ({
       ...state,
       isAuthenticated: false,
@@ -601,9 +640,6 @@ export const useAppStore = create((set, get) => ({
       lastError: null,
       lastNotice: null,
     }))
-    window.localStorage.removeItem(STORAGE_KEY)
-    sessionStorage.removeItem(SESSION_KEY)
-    window.localStorage.removeItem('agentforge-session-v1')
   },
 
   async hydrateFromApi() {
