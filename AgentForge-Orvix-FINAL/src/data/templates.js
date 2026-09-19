@@ -4,8 +4,8 @@
 const emailAutomation = {
   name: 'Email Automation Agent',
   nodes: [
-    { id: 'n1', type: 'workflow', position: { x: 40, y: 140 }, data: { kind: 'trigger', icon: 'Mail', title: 'Gmail Trigger', subtitle: 'When new email arrives', instructions: 'When a new email arrives in Gmail.' } },
-    { id: 'n2', type: 'workflow', position: { x: 320, y: 140 }, data: { kind: 'action', icon: 'Inbox', title: 'Fetch Emails', subtitle: 'Get email content', instructions: 'Fetch the email content.' } },
+    { id: 'n1', type: 'workflow', position: { x: 40, y: 140 }, data: { kind: 'trigger', icon: 'Mail', title: 'Email Input', subtitle: 'When email data is provided', instructions: 'Process the email content supplied as the run input.' } },
+    { id: 'n2', type: 'workflow', position: { x: 320, y: 140 }, data: { kind: 'action', icon: 'Inbox', title: 'Prepare Email', subtitle: 'Prepare message content', instructions: 'Prepare the supplied email content for analysis.' } },
     { id: 'n3', type: 'workflow', position: { x: 600, y: 140 }, data: { kind: 'ai', icon: 'Sparkles', title: 'AI Summarizer', subtitle: 'Summarize & find important', instructions: 'Summarize the email and identify important messages.' } },
     { id: 'n4', type: 'workflow', position: { x: 880, y: 140 }, data: { kind: 'condition', icon: 'AlertTriangle', title: 'Urgency Check', subtitle: 'Is it urgent?', instructions: 'Continue when the email is urgent.' } },
     { id: 'n5', type: 'workflow', position: { x: 700, y: 320 }, data: { kind: 'action', icon: 'CheckSquare', title: 'Create Task', subtitle: 'Add to task list', instructions: 'Create a task for each important item.' } },
@@ -19,8 +19,8 @@ const emailAutomation = {
     { id: 'e5-6', source: 'n5', target: 'n6', animated: false },
   ],
   logSteps: [
-    'Gmail connected',
-    '12 emails fetched',
+    'Email input received',
+    'Email content prepared',
     '4 important messages identified',
     '2 urgent items detected',
     '2 tasks created',
@@ -131,7 +131,7 @@ export const TEMPLATES = {
 }
 
 export const TEMPLATE_LIST = [
-  { key: 'email', name: 'Email Summarizer', description: 'Read your emails, summarize important messages, and create tasks.', color: 'primary' },
+  { key: 'email', name: 'Email Summarizer', description: 'Process email content, summarize important messages, and create tasks.', color: 'primary' },
   { key: 'feedback', name: 'Customer Feedback Analyzer', description: 'Analyze customer feedback and create tasks for negative feedback.', color: 'secondary' },
   { key: 'sales', name: 'Sales Monitor', description: 'Track sales data, find trends and notify you of important changes.', color: 'success' },
   { key: 'meeting', name: 'Meeting Follow-up Agent', description: 'Summarize meetings and create action items.', color: 'accent' },
