@@ -12,6 +12,7 @@ const volatilePasswords = new Map()
 const workflowSyncQueues = new Map()
 const workflowSyncTimers = new Map()
 const pendingServerCreations = new Set()
+const lastServerWorkflowSnapshots = new Map()
 function nextId(prefix) {
   return `${prefix}-${Date.now().toString(36)}-${Math.random().toString(36).substring(2, 7)}`
 }
@@ -260,6 +261,10 @@ function flushPersistState() {
 
   snapshot.workflows.forEach((workflow) => {
     if (pendingServerCreations.has(workflow.id)) return
+
+    const workflowSnapshot = JSON.stringify(workflow)
+    if (lastServerWorkflowSnapshots.get(workflow.id) === workflowSnapshot) return
+
     const existingTimer = workflowSyncTimers.get(workflow.id)
     if (existingTimer) clearTimeout(existingTimer)
 
@@ -271,8 +276,12 @@ function flushPersistState() {
         .then(() => apiRequest(`/workflows/${workflow.id}`, {
           method: 'PATCH',
           body: workflow,
-          timeoutMs: 15000,
+          timeoutMs: 10000,
         }))
+        .then(() => {
+          lastServerWorkflowSnapshots.set(workflow.id, workflowSnapshot)
+        })
+
       const syncPromise = next.finally(() => {
         if (workflowSyncQueues.get(workflow.id) === syncPromise) workflowSyncQueues.delete(workflow.id)
       })
@@ -329,7 +338,7 @@ function readStoredState() {
     }
 
     const parsed = JSON.parse(raw)
-    const hasStoredApiSession = Boolean(getApiToken() && getStoredSession()?.email)
+    const hasStoredApiSession = Boolean(getApiToken())
     return {
       ...getDefaultState(),
       ...parsed,
@@ -458,7 +467,9 @@ export const useAppStore = create((set, get) => ({
     try {
       const response = await apiRequest('/auth/login', { method: 'POST', body: { email, password } })
       setApiToken(response.token, remember)
-      set((state) => ({ ...state, isAuthenticated: true, userEmail: response.user.email, userName: response.user.name, workflows: (response.workflows || []).map(normalizeWorkflow), notifications: response.notifications || DEFAULT_NOTIFICATIONS, emailNotifications: response.user.emailNotifications !== false, lastError: null }))
+      const serverWorkflows = (response.workflows || []).map(normalizeWorkflow)
+      serverWorkflows.forEach((workflow) => lastServerWorkflowSnapshots.set(workflow.id, JSON.stringify(workflow)))
+      set((state) => ({ ...state, isAuthenticated: true, userEmail: response.user.email, userName: response.user.name, workflows: serverWorkflows, notifications: response.notifications || DEFAULT_NOTIFICATIONS, emailNotifications: response.user.emailNotifications !== false, lastError: null }))
       persistState(get())
       if (remember) saveStoredSession({ email: response.user.email })
       else saveStoredSession(null)
@@ -616,7 +627,6 @@ export const useAppStore = create((set, get) => ({
     }))
 
     saveStoredAccounts(nextUsers)
-    saveStoredSession({ email: normalizedEmail, password: nextUsers[normalizedEmail]?.password || '' })
     persistState(get())
     if (!getApiToken()) return true
     try {
@@ -665,6 +675,13 @@ export const useAppStore = create((set, get) => ({
       return syncCurrentUser(nextState)
     })
     persistState(get())
+    if (getApiToken()) {
+      apiRequest('/notifications/read', { method: 'PATCH', timeoutMs: 8000 })
+        .then((response) => {
+          if (response.notifications) set({ notifications: response.notifications })
+        })
+        .catch(() => {})
+    }
   },
 
   addNotification(notification) {
@@ -701,6 +718,7 @@ export const useAppStore = create((set, get) => ({
     // an in-flight editor save from recreating the workflow after deletion.
     const queuedSave = workflowSyncQueues.get(workflowId)
     workflowSyncQueues.delete(workflowId)
+    lastServerWorkflowSnapshots.delete(workflowId)
     pendingServerCreations.delete(workflowId)
 
     if (pendingPersistSnapshot?.workflows) {
@@ -775,7 +793,9 @@ export const useAppStore = create((set, get) => ({
         body: { ...targetWorkflow, isDeployed: true, isActive: true, webhookToken: generatedToken },
       })
       if (!response.workflow) return { workflow: get().getWorkflow(workflowId), webhookUrl: response.webhookUrl || getApiUrl(`/hooks/${generatedToken}`) }
-      set((state) => ({ ...state, workflows: state.workflows.map((current) => current.id === workflowId ? normalizeWorkflow(response.workflow) : current), lastError: null }))
+      const normalized = normalizeWorkflow(response.workflow)
+      lastServerWorkflowSnapshots.set(normalized.id, JSON.stringify(normalized))
+      set((state) => ({ ...state, workflows: state.workflows.map((current) => current.id === workflowId ? normalized : current), lastError: null }))
       if (response.notifications) set({ notifications: response.notifications })
       persistState(get())
       return response
@@ -809,7 +829,9 @@ export const useAppStore = create((set, get) => ({
     if (getApiToken()) {
       apiRequest(`/workflows/${workflowId}/sandbox`, { method: 'POST' }).then((response) => {
         if (!response.workflow) return
-        set((state) => ({ ...state, workflows: state.workflows.map((current) => current.id === workflowId ? normalizeWorkflow(response.workflow) : current), notifications: response.notifications || state.notifications }))
+        const normalized = normalizeWorkflow(response.workflow)
+        lastServerWorkflowSnapshots.set(normalized.id, JSON.stringify(normalized))
+        set((state) => ({ ...state, workflows: state.workflows.map((current) => current.id === workflowId ? normalized : current), notifications: response.notifications || state.notifications }))
         persistState(get())
       }).catch(() => {})
     }
@@ -917,9 +939,13 @@ export const useAppStore = create((set, get) => ({
         apiRequest(`/workflows/${response.workflow.id}`, { method: 'DELETE', timeoutMs: 10000 }).catch(() => {})
         return
       }
+      const normalized = normalizeWorkflow(response.workflow)
+      lastServerWorkflowSnapshots.set(normalized.id, JSON.stringify(normalized))
       set((state) => ({
         ...state,
-        workflows: state.workflows.map((current) => current.id === id ? normalizeWorkflow(response.workflow) : current),
+        workflows: response.workflow.id === id
+          ? state.workflows.map((current) => current.id === id ? normalized : current)
+          : [normalized, ...state.workflows.filter((current) => current.id !== id && current.id !== normalized.id)],
         notifications: response.notifications || state.notifications,
       }))
       persistState(get())
@@ -1019,7 +1045,9 @@ export const useAppStore = create((set, get) => ({
       try {
         const response = await apiRequest(`/workflows/${workflowId}/run`, { method: 'POST', body: { input: input ?? workflow.prompt } })
         if (response.workflow) {
-          set((state) => ({ ...state, workflows: state.workflows.map((current) => current.id === workflowId ? normalizeWorkflow(response.workflow) : current), notifications: response.notifications || state.notifications, lastError: response.run?.error || null }))
+          const normalized = normalizeWorkflow(response.workflow)
+          lastServerWorkflowSnapshots.set(normalized.id, JSON.stringify(normalized))
+          set((state) => ({ ...state, workflows: state.workflows.map((current) => current.id === workflowId ? normalized : current), notifications: response.notifications || state.notifications, lastError: response.run?.error || null }))
           persistState(get())
         }
         onDone && onDone()
