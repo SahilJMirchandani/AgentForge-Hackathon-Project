@@ -98,7 +98,7 @@ export default function Login() {
         setGoogleLoading(false)
         window.history.replaceState({}, '', '/login')
         if (success) {
-          navigate('/')
+          navigate('/dashboard')
         }
       })
       return
