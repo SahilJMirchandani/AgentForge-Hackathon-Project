@@ -300,6 +300,7 @@ function readStoredState() {
       emailNotifications: parsed.emailNotifications !== false,
       users: parsed.users && typeof parsed.users === 'object' ? Object.fromEntries(Object.entries(parsed.users).map(([email, account]) => { const { password, ...safeAccount } = account || {}; return [email, safeAccount] })) : getStoredAccounts(),
       isNotificationsOpen: !!parsed.isNotificationsOpen,
+      lastError: null,
     }
   } catch {
     return getDefaultState()
