@@ -1,0 +1,24 @@
+name: AgentForge Build Verification
+
+on:
+  pull_request:
+    paths:
+      - 'AgentForge-Orvix-FINAL/**'
+      - '.github/workflows/agentforge-build.yml'
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: AgentForge-Orvix-FINAL
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: AgentForge-Orvix-FINAL/package-lock.json
+      - run: npm ci
+      - run: npm run build
