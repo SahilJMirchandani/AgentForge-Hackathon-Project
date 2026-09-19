@@ -10,6 +10,7 @@ const DEFAULT_NOTIFICATIONS = [{ id: 'welcome', title: 'Welcome back', message: 
 
 const volatilePasswords = new Map()
 const workflowSyncQueues = new Map()
+const workflowSyncTimers = new Map()
 function nextId(prefix) {
   return `${prefix}-${Date.now().toString(36)}-${Math.random().toString(36).substring(2, 7)}`
 }
@@ -256,16 +257,34 @@ function persistState(state) {
 
   window.localStorage.setItem(STORAGE_KEY, JSON.stringify(snapshot))
   saveStoredAccounts(snapshot.users || {})
-  if (getApiToken() && snapshot.userEmail) {
-    snapshot.workflows.forEach((workflow) => {
+
+  if (!getApiToken() || !snapshot.userEmail) return
+
+  // Local storage is immediate. Server persistence is deliberately debounced so
+  // dragging nodes, typing, or toggling controls does not create a network
+  // request for every single state update.
+  snapshot.workflows.forEach((workflow) => {
+    const existingTimer = workflowSyncTimers.get(workflow.id)
+    if (existingTimer) clearTimeout(existingTimer)
+
+    const timer = setTimeout(() => {
+      workflowSyncTimers.delete(workflow.id)
       const previous = workflowSyncQueues.get(workflow.id) || Promise.resolve()
-      const next = previous.catch(() => {}).then(() => apiRequest(`/workflows/${workflow.id}`, { method: 'PATCH', body: workflow }))
+      const next = previous
+        .catch(() => {})
+        .then(() => apiRequest(`/workflows/${workflow.id}`, {
+          method: 'PATCH',
+          body: workflow,
+          timeoutMs: 15000,
+        }))
       const syncPromise = next.finally(() => {
         if (workflowSyncQueues.get(workflow.id) === syncPromise) workflowSyncQueues.delete(workflow.id)
       })
       workflowSyncQueues.set(workflow.id, syncPromise)
-    })
-  }
+    }, 500)
+
+    workflowSyncTimers.set(workflow.id, timer)
+  })
 }
 
 function readStoredState() {
