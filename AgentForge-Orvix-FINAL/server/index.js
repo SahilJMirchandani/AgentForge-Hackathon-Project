@@ -11,7 +11,7 @@ import { deliverNotification, extractDestinationFromPrompt, resolveChannel, vali
 import { smsStatus } from './sms.js'
 import { executeWorkflow } from './executor.js'
 import { startScheduler } from './scheduler.js'
-import { exchangeGoogleCode, googleAuthorizationUrl, googleConfigured, googleAuthLoginUrl, exchangeGoogleAuthCode, fetchGoogleUserInfo } from './oauth.js'
+import { googleConfigured, googleAuthLoginUrl, exchangeGoogleAuthCode, fetchGoogleUserInfo } from './oauth.js'
 import { rateLimit } from './rate-limit.js'
 import { getAppConfig, resolveAllowedOrigins } from './config.js'
 
@@ -330,44 +330,6 @@ async function handle(req, res) {
     }
     if (req.method === 'GET' && url.pathname === '/api/health') return json(res, 200, { ok: true }, allowedOrigin)
     if (req.method === 'GET' && url.pathname === '/api/ready') { const database = databaseStatus(); const ready = !database.configured || database.provider === 'mongodb'; return json(res, ready ? 200 : 503, { ok: ready }, allowedOrigin) }
-    if (req.method === 'GET' && url.pathname === '/api/integrations/google/callback') {
-      const stateKey = url.searchParams.get('state')
-      const state = db.oauthStates[stateKey]
-      const settingsUrl = `${CLIENT_ORIGIN.replace(/\/$/, '')}/settings`
-      if (!state || state.expiresAt <= Date.now()) {
-        res.writeHead(302, { location: `${settingsUrl}?google=error&message=${encodeURIComponent('Google connection state expired. Please connect again.')}` })
-        return res.end()
-      }
-      if (cookieValue(req, 'agentforge-google-state') !== stateKey) {
-        res.writeHead(302, { location: `${settingsUrl}?google=error&message=${encodeURIComponent('Google connection state could not be verified. Please connect again.')}` })
-        return res.end()
-      }
-      if (url.searchParams.get('error')) {
-        res.writeHead(302, { location: `${settingsUrl}?google=cancelled` })
-        return res.end()
-      }
-      const user = db.users[state.email]
-      if (!user) {
-        res.writeHead(302, { location: `${settingsUrl}?google=error&message=${encodeURIComponent('AgentForge account not found.')}` })
-        return res.end()
-      }
-      try {
-        const code = url.searchParams.get('code')
-        if (!code) throw new Error('Google authorization code missing')
-        user.googleOAuth = await exchangeGoogleCode(code)
-        delete db.oauthStates[stateKey]
-        saveDb(db).catch((error) => console.warn(`Google OAuth persistence warning: ${error.message}`))
-        res.writeHead(302, {
-          location: `${settingsUrl}?google=connected`,
-          'set-cookie': 'agentforge-google-state=; HttpOnly; SameSite=Lax; Path=/api/integrations/google; Max-Age=0',
-        })
-        return res.end()
-      } catch (error) {
-        console.error(`Google connection callback failed: ${error.message}`)
-        res.writeHead(302, { location: `${settingsUrl}?google=error&message=${encodeURIComponent(error.message || 'Google connection failed')}` })
-        return res.end()
-      }
-    }
     if (['GET', 'POST'].includes(req.method) && parts[1] === 'hooks' && parts[2]) {
       const hookToken = parts[2]
       let workflow = Object.values(db.workflows || {}).find((candidate) => candidate && candidate.webhookToken === hookToken)
@@ -400,9 +362,6 @@ async function handle(req, res) {
       return json(res, run.status === 'Completed' ? 200 : 422, { run, workflow: publicWorkflow(workflow) }, allowedOrigin)
     }
     const user = requireUser(req, res); if (!user) return
-    if (req.method === 'GET' && url.pathname === '/api/integrations') return json(res, 200, { google: { configured: googleConfigured(), connected: Boolean(user.googleOAuth) }, slack: { configured: true } })
-    if (req.method === 'POST' && url.pathname === '/api/integrations/google/connect') { if (!googleConfigured()) return json(res, 503, { error: 'Google OAuth is not configured on the server' }); const state = randomBytes(24).toString('hex'); db.oauthStates[state] = { email: user.email, expiresAt: Date.now() + 10 * 60 * 1000 }; const authorizationUrl = googleAuthorizationUrl(state); saveDb(db).catch((error) => console.warn(`OAuth state persistence warning: ${error.message}`)); return json(res, 200, { url: authorizationUrl }, allowedOrigin, { 'set-cookie': `agentforge-google-state=${state}; HttpOnly; SameSite=Lax; Path=/api/integrations/google; Max-Age=600` }) }
-    if (req.method === 'DELETE' && url.pathname === '/api/integrations/google') { delete user.googleOAuth; saveDb(db).catch((error) => console.warn(`Google disconnect persistence warning: ${error.message}`)); return json(res, 200, { ok: true }) }
     if (req.method === 'GET' && url.pathname === '/api/me') return json(res, 200, { user: publicUser(user), workflows: Object.values(db.workflows).filter((workflow) => workflow.userId === user.id).map(publicWorkflow), notifications: db.notifications[user.email] || [] })
     if (req.method === 'POST' && url.pathname === '/api/auth/logout') { const token = (req.headers.authorization || '').replace(/^Bearer\s+/i, ''); delete db.sessions[sessionKey(token)]; delete db.sessions[token]; saveDb(db).catch((error) => console.warn(`Logout persistence warning: ${error.message}`)); return json(res, 200, { ok: true }) }
     if (req.method === 'GET' && url.pathname === '/api/templates') return json(res, 200, { templates: Object.entries(TEMPLATES).map(([key, template]) => ({ key, name: template.name, nodes: template.nodes, edges: template.edges })) })
