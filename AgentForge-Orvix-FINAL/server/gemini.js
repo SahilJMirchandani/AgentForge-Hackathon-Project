@@ -25,7 +25,7 @@ async function requestGemini(body) {
   let lastError = null
 
   for (const currentModel of models) {
-    const attempts = currentModel === model ? 2 : 1
+    const attempts = 1
 
     for (let attempt = 0; attempt < attempts; attempt += 1) {
       const controller = new AbortController()
