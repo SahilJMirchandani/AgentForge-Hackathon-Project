@@ -26,15 +26,19 @@ export default function CreateWorkflow() {
   const createWorkflow = useAppStore((s) => s.createWorkflow)
   const navigate = useNavigate()
 
-  function handleGenerate(text = prompt) {
-    if (!text.trim()) return
+  async function handleGenerate(text = prompt) {
+    if (!text.trim() || generating) return
     setShowError(false)
     setGenerating(true)
-    createWorkflow(text).then((id) => {
-      setGenerating(false)
+    try {
+      const id = await createWorkflow(text)
       if (id) navigate(`/workflow/${id}`)
       else setShowError(true)
-    })
+    } catch {
+      setShowError(true)
+    } finally {
+      setGenerating(false)
+    }
   }
 
   return (
