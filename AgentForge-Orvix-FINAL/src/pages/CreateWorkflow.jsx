@@ -14,7 +14,7 @@ function ModelBadge() {
   return (
     <div className="inline-flex items-center gap-1.5 rounded-full bg-ink/5 px-2.5 py-1 text-xs text-ink-soft">
       <Sparkles size={12} className="text-primary" />
-      <span>Gemini 3.5 Flash</span>
+      <span>Gemini Flash</span>
     </div>
   )
 }
