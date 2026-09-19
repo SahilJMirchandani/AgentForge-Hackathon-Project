@@ -130,7 +130,7 @@ function documentsEqual(left, right) {
 }
 
 export async function saveDb(db) {
-  const safeDb = sanitizeDbState(db)
+  const safeDb = structuredClone(sanitizeDbState(db))
   writeQueue = writeQueue.catch(() => {}).then(async () => {
     if (mongoDatabase) {
       try {
