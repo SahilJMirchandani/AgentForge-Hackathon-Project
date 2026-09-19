@@ -11,6 +11,8 @@ const DEFAULT_NOTIFICATIONS = [{ id: 'welcome', title: 'Welcome back', message: 
 const volatilePasswords = new Map()
 const workflowSyncQueues = new Map()
 const workflowSyncTimers = new Map()
+const pendingServerCreations = new Set()
+const workflowSyncTimers = new Map()
 function nextId(prefix) {
   return `${prefix}-${Date.now().toString(36)}-${Math.random().toString(36).substring(2, 7)}`
 }
@@ -258,6 +260,7 @@ function flushPersistState() {
   if (!getApiToken() || !snapshot.userEmail) return
 
   snapshot.workflows.forEach((workflow) => {
+    if (pendingServerCreations.has(workflow.id)) return
     const existingTimer = workflowSyncTimers.get(workflow.id)
     if (existingTimer) clearTimeout(existingTimer)
 
@@ -327,6 +330,7 @@ function readStoredState() {
     }
 
     const parsed = JSON.parse(raw)
+    const hasStoredApiSession = Boolean(getApiToken() && getStoredSession()?.email)
     return {
       ...getDefaultState(),
       ...parsed,
@@ -334,6 +338,7 @@ function readStoredState() {
       notifications: Array.isArray(parsed.notifications) && parsed.notifications.length ? parsed.notifications : DEFAULT_NOTIFICATIONS,
       emailNotifications: parsed.emailNotifications !== false,
       users: parsed.users && typeof parsed.users === 'object' ? Object.fromEntries(Object.entries(parsed.users).map(([email, account]) => { const { password, ...safeAccount } = account || {}; return [email, safeAccount] })) : getStoredAccounts(),
+      isAuthenticated: hasStoredApiSession,
       isNotificationsOpen: !!parsed.isNotificationsOpen,
       lastError: null,
     }
@@ -345,7 +350,7 @@ function readStoredState() {
 export const useAppStore = create((set, get) => ({
   ...readStoredState(),
 
-  loginLocal(email, password, displayName) {
+  loginLocal(email, password, displayName, remember = true) {
     const normalizedEmail = normalizeEmail(email)
     const accountEmail = normalizedEmail || 'user@local'
     const passwordValue = String(password || '').trim()
@@ -399,12 +404,13 @@ export const useAppStore = create((set, get) => ({
     set((state) => ({ ...state, users: nextUsers }))
     volatilePasswords.set(accountEmail, existing?.password || passwordValue)
     saveStoredAccounts(nextUsers)
-    saveStoredSession({ email: accountEmail, password: existing?.password || passwordValue })
+    if (remember) saveStoredSession({ email: accountEmail })
+    else saveStoredSession(null)
     persistState(get())
     return true
   },
 
-  signupLocal(name, email, password) {
+  signupLocal(name, email, password, remember = true) {
     const normalizedName = String(name || '').trim() || 'User'
     const normalizedEmail = normalizeEmail(email) || 'user@local'
     const passwordValue = String(password || '').trim()
@@ -441,20 +447,22 @@ export const useAppStore = create((set, get) => ({
     set((state) => ({ ...state, users: nextUsers }))
     volatilePasswords.set(normalizedEmail, passwordValue || existing?.password || '')
     saveStoredAccounts(nextUsers)
-    saveStoredSession({ email: normalizedEmail, password: passwordValue || (existing?.password || '') })
+    if (remember) saveStoredSession({ email: normalizedEmail })
+    else saveStoredSession(null)
     persistState(get())
     return true
   },
 
   async login(email, password, displayName, remember = true) {
     setApiToken(null)
-    const localResult = get().loginLocal(email, password, displayName)
+    const localResult = get().loginLocal(email, password, displayName, remember)
     try {
       const response = await apiRequest('/auth/login', { method: 'POST', body: { email, password } })
       setApiToken(response.token, remember)
       set((state) => ({ ...state, isAuthenticated: true, userEmail: response.user.email, userName: response.user.name, workflows: (response.workflows || []).map(normalizeWorkflow), notifications: response.notifications || DEFAULT_NOTIFICATIONS, emailNotifications: response.user.emailNotifications !== false, lastError: null }))
       persistState(get())
-      saveStoredSession({ email: response.user.email, password, name: response.user.name })
+      if (remember) saveStoredSession({ email: response.user.email })
+      else saveStoredSession(null)
       return true
     } catch (error) {
       setApiToken(null)
@@ -466,13 +474,14 @@ export const useAppStore = create((set, get) => ({
 
   async signup(name, email, password, remember = true) {
     setApiToken(null)
-    const localResult = get().signupLocal(name, email, password)
+    const localResult = get().signupLocal(name, email, password, remember)
     try {
       const response = await apiRequest('/auth/signup', { method: 'POST', body: { name, email, password } })
       setApiToken(response.token, remember)
       set((state) => ({ ...state, isAuthenticated: true, userEmail: response.user.email, userName: response.user.name, workflows: state.workflows, notifications: response.notifications || state.notifications, emailNotifications: true, lastError: null }))
       persistState(get())
-      saveStoredSession({ email: response.user.email, password, name: response.user.name })
+      if (remember) saveStoredSession({ email: response.user.email })
+      else saveStoredSession(null)
       return true
     } catch (error) {
       setApiToken(null)
@@ -542,7 +551,29 @@ export const useAppStore = create((set, get) => ({
   },
 
   clearSavedSession() {
+    const token = getApiToken()
+    if (token) apiRequest('/auth/logout', { method: 'POST' }).catch(() => {})
     saveStoredSession(null)
+    setApiToken(null)
+    pendingPersistSnapshot = null
+    if (persistTimer) {
+      clearTimeout(persistTimer)
+      persistTimer = null
+    }
+    set((state) => ({
+      ...state,
+      isAuthenticated: false,
+      userEmail: '',
+      userName: 'User',
+      isNotificationsOpen: false,
+      lastError: null,
+      lastNotice: null,
+    }))
+    window.localStorage.setItem(STORAGE_KEY, JSON.stringify({
+      ...getDefaultState(),
+      users: get().users || {},
+      workflows: [],
+    }))
   },
 
   async hydrateFromApi() {
@@ -663,6 +694,19 @@ export const useAppStore = create((set, get) => ({
   },
 
   deleteWorkflow(workflowId) {
+    const timer = workflowSyncTimers.get(workflowId)
+    if (timer) clearTimeout(timer)
+    workflowSyncTimers.delete(workflowId)
+    workflowSyncQueues.delete(workflowId)
+    pendingServerCreations.delete(workflowId)
+
+    if (pendingPersistSnapshot?.workflows) {
+      pendingPersistSnapshot = {
+        ...pendingPersistSnapshot,
+        workflows: pendingPersistSnapshot.workflows.filter((workflow) => workflow.id !== workflowId),
+      }
+    }
+
     set((state) => {
       const nextWorkflows = state.workflows.filter((w) => w.id !== workflowId)
       const nextState = {
@@ -675,7 +719,8 @@ export const useAppStore = create((set, get) => ({
       }
       return syncCurrentUser(nextState)
     })
-    apiRequest(`/workflows/${workflowId}`, { method: 'DELETE' }).catch(() => {})
+
+    apiRequest(`/workflows/${workflowId}`, { method: 'DELETE', timeoutMs: 10000 }).catch(() => {})
     persistState(get())
   },
 
@@ -856,11 +901,23 @@ export const useAppStore = create((set, get) => ({
       return syncCurrentUser(nextState)
     })
     persistState(get())
+    pendingServerCreations.add(id)
     apiRequest('/workflows', { method: 'POST', body: { id, prompt } }).then((response) => {
+      pendingServerCreations.delete(id)
       if (!response.workflow) return
-      set((state) => ({ ...state, workflows: state.workflows.map((current) => current.id === id ? normalizeWorkflow(response.workflow) : current), notifications: response.notifications || state.notifications }))
+      if (!get().getWorkflow(id)) {
+        apiRequest(`/workflows/${response.workflow.id}`, { method: 'DELETE', timeoutMs: 10000 }).catch(() => {})
+        return
+      }
+      set((state) => ({
+        ...state,
+        workflows: state.workflows.map((current) => current.id === id ? normalizeWorkflow(response.workflow) : current),
+        notifications: response.notifications || state.notifications,
+      }))
       persistState(get())
-    }).catch(() => {})
+    }).catch(() => {
+      pendingServerCreations.delete(id)
+    })
     return id
   },
 
