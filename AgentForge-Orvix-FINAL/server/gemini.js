@@ -14,6 +14,10 @@ const FALLBACK_MODELS = [
   'gemini-2.5-pro',
   'gemini-2.5-flash',
   'gemini-2.5-flash-lite',
+  'gemini-3.1-pro-preview',
+  'gemini-3-flash-preview',
+  'gemma-4-31b-it',
+  'gemma-4-26b-a4b-it',
 ]
 const TRANSIENT_STATUSES = new Set([408, 409, 425, 429, 500, 502, 503, 504])
 const MODEL_UNAVAILABLE_STATUSES = new Set([400, 404, 405, 410, 422])
@@ -98,8 +102,22 @@ function modelCandidates(discovered, preferred) {
 
   const preferredAvailable = known.filter((name) => available.has(name))
   const knownAvailable = FALLBACK_MODELS.filter((name) => available.has(name))
-  const discoveredFlash = [...available].filter((name) => /flash/i.test(name) && !known.includes(name)).slice(0, 3)
-  return [...new Set([...preferredAvailable, ...knownAvailable, ...discoveredFlash])].slice(0, 6)
+  const discoveredText = [...available].filter((name) => /^(gemini|gemma)-/i.test(name) && !known.includes(name) && !/(image|tts|audio|music|lyria|embedding)/i.test(name)).slice(0, 4)
+  return [...new Set([...preferredAvailable, ...knownAvailable, ...discoveredText])].slice(0, 8)
+}
+
+function generationConfigForModel(model, jsonSchema) {
+  const config = jsonSchema
+    ? { responseMimeType: 'application/json', responseSchema: jsonSchema }
+    : {}
+
+  if (/^gemini-3\\./i.test(model) || /^gemini-3-/i.test(model)) {
+    config.thinkingConfig = { thinkingLevel: 'low' }
+  } else if (/^gemini-2\\.5-/i.test(model)) {
+    config.thinkingConfig = { thinkingBudget: 256 }
+  }
+
+  return config
 }
 
 async function nativeRequest(model, body) {
@@ -183,11 +201,7 @@ async function requestJson(prompt, responseSchema) {
     const promptWithJsonInstruction = `${prompt}\n\nReturn ONLY valid JSON matching this schema. Do not wrap it in markdown.\n${JSON.stringify(lowerSchema)}`
     const native = await nativeRequest(currentModel, {
       contents: [{ role: 'user', parts: [{ text: promptWithJsonInstruction }] }],
-      generationConfig: {
-        responseMimeType: 'application/json',
-        responseSchema: lowerSchema,
-        thinkingConfig: { thinkingLevel: 'low' },
-      },
+      generationConfig: generationConfigForModel(currentModel, lowerSchema),
     })
 
     if (native.response?.ok) {
@@ -202,6 +216,12 @@ async function requestJson(prompt, responseSchema) {
       lastError = native.error
     } else if (native.response) {
       lastError = new Error(`Gemini request failed (${native.response.status})${native.detail ? `: ${native.detail.slice(0, 500)}` : ''}`)
+    }
+
+    const nativeRetryable = isRetryableError(native.response?.status, native.error)
+    if (nativeRetryable) {
+      await sleep(120)
+      continue
     }
 
     const compat = await compatRequest(currentModel, [{ role: 'system', content: 'Return only valid JSON. Never add markdown.' }, { role: 'user', content: promptWithJsonInstruction }], true)
@@ -219,9 +239,7 @@ async function requestJson(prompt, responseSchema) {
       lastError = new Error(`Gemini compatibility request failed (${compat.response.status})${compat.detail ? `: ${compat.detail.slice(0, 500)}` : ''}`)
     }
 
-    if (!isRetryableError(native.response?.status, native.error) && !isRetryableError(compat.response?.status, compat.error)) {
-      // A non-transient provider/configuration error should not burn through
-      // every model. The deterministic fallback will keep the product usable.
+    if (!isRetryableError(compat.response?.status, compat.error)) {
       break
     }
 
@@ -242,7 +260,7 @@ async function requestText(prompt) {
   for (const currentModel of models) {
     const native = await nativeRequest(currentModel, {
       contents: [{ role: 'user', parts: [{ text: prompt }] }],
-      generationConfig: { thinkingConfig: { thinkingLevel: 'low' } },
+      generationConfig: generationConfigForModel(currentModel),
     })
     if (native.response?.ok) {
       try {
@@ -256,6 +274,12 @@ async function requestText(prompt) {
       lastError = native.error
     } else {
       lastError = new Error(`Gemini request failed (${native.response?.status || 'unknown'})`)
+    }
+
+    const nativeRetryable = isRetryableError(native.response?.status, native.error)
+    if (nativeRetryable) {
+      await sleep(120)
+      continue
     }
 
     const compat = await compatRequest(currentModel, [
