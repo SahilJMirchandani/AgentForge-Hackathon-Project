@@ -235,13 +235,13 @@ async function handle(req, res) {
       if (!safeName || !normalized || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalized) || safePassword.length < 6) return json(res, 400, { error: 'Name, email, and a password of at least 6 characters are required' })
       if (db.users[normalized]) return json(res, 409, { error: 'An account already exists for this email' })
       const user = { id: randomUUID(), name: safeName, email: normalized, ...hashPassword(safePassword), emailNotifications: true }; db.users[normalized] = user; db.notifications[normalized] = [{ id: randomUUID(), title: 'Welcome back', message: 'Your workspace is ready.', read: false, createdAt: Date.now() }]
-      const token = tokenFor(normalized); await saveDb(db); return json(res, 201, { token, user: publicUser(user), workflows: [] })
+      const token = tokenFor(normalized); saveDb(db).catch((error) => console.warn(`Signup persistence warning: ${error.message}`)); return json(res, 201, { token, user: publicUser(user), workflows: [], notifications: db.notifications[normalized] || [] })
     }
     if (req.method === 'POST' && url.pathname === '/api/auth/login') {
       const { email, password } = await readBody(req); const normalized = normalizeEmail(email)
       const user = db.users[normalized]
       if (!user || !validPassword(String(password || ''), user)) return json(res, 401, { error: 'Invalid email or password' })
-      const token = tokenFor(user.email); await saveDb(db); return json(res, 200, { token, user: publicUser(user), workflows: Object.values(db.workflows).filter((workflow) => workflow.userId === user.id).map(publicWorkflow), notifications: db.notifications[user.email] || [] })
+      const token = tokenFor(user.email); saveDb(db).catch((error) => console.warn(`Login persistence warning: ${error.message}`)); return json(res, 200, { token, user: publicUser(user), workflows: Object.values(db.workflows).filter((workflow) => workflow.userId === user.id).map(publicWorkflow), notifications: db.notifications[user.email] || [] })
     }
     if (req.method === 'POST' && url.pathname === '/api/auth/reset') {
       const { email } = await readBody(req)
@@ -251,8 +251,8 @@ async function handle(req, res) {
         for (const [tokenHash, value] of Object.entries(db.resetTokens || {})) if (value.email === normalized) delete db.resetTokens[tokenHash]
         const token = randomBytes(32).toString('hex')
         db.resetTokens[hashResetToken(token)] = { email: normalized, expiresAt: Date.now() + RESET_TOKEN_TTL_MS }
-        try { await sendPasswordResetEmail({ to: normalized, token }) } catch (error) { console.warn(`Password reset email failed: ${error.message}`) }
-        await saveDb(db)
+        saveDb(db).catch((error) => console.warn(`Password reset persistence warning: ${error.message}`))
+        void sendPasswordResetEmail({ to: normalized, token }).catch((error) => console.warn(`Password reset email failed: ${error.message}`))
       }
       return json(res, 200, { message: 'If that account exists, a reset link has been sent.' })
     }
@@ -478,7 +478,7 @@ async function handle(req, res) {
       workflow.isDeployed = true; workflow.isActive = true; workflow.webhookToken ||= randomBytes(32).toString('hex'); notify(user, 'Agent deployed', `${workflow.name} is live and ready to receive webhook events.`); saveDb(db).catch((error) => console.warn(`Deployment persistence warning: ${error.message}`)); const publicApiOrigin = appConfig.publicApiOrigin || `${req.headers['x-forwarded-proto'] || 'http'}://${req.headers.host}`; const webhookUrl = `${publicApiOrigin.replace(/\/$/, '')}/api/hooks/${workflow.webhookToken}`; return json(res, 200, { workflow: publicWorkflow(workflow), notifications: db.notifications[user.email], webhookUrl }, allowedOrigin)
     }
     if (parts[1] === 'workflows' && parts[3] === 'sandbox' && req.method === 'POST' && workflow) { let evaluation = null; try { evaluation = await evaluateWorkflow(workflow) } catch (error) { console.warn(error.message) } if (evaluation) { workflow.sandboxScore = evaluation.score; workflow.sandboxTests = evaluation.tests; workflow.sandboxSource = 'gemini' } else { workflow.sandboxScore = staticScore(workflow); workflow.sandboxTests = []; workflow.sandboxSource = 'heuristic' } saveDb(db).catch((error) => console.warn(`Sandbox persistence warning: ${error.message}`)); return json(res, 200, { workflow: publicWorkflow(workflow), sandboxSource: workflow.sandboxSource }) }
-    if (req.method === 'PATCH' && url.pathname === '/api/profile') { const body = await readBody(req); const oldEmail = user.email; const email = normalizeEmail(body.email || oldEmail); const name = sanitizeText(body.name || user.name, 120); if (!/^\S+@\S+\.\S+$/.test(email) || !name) return json(res, 400, { error: 'A valid email and name are required' }); if (email !== oldEmail && db.users[email]) return json(res, 409, { error: 'That email is already in use' }); delete db.users[oldEmail]; user.email = email; user.name = name; db.users[email] = user; if (db.notifications[oldEmail]) { db.notifications[email] = db.notifications[oldEmail]; delete db.notifications[oldEmail] } for (const [token, session] of Object.entries(db.sessions)) { const sessionEmail = typeof session === 'string' ? session : session.email; if (sessionEmail === oldEmail) db.sessions[token] = { email, expiresAt: typeof session === 'string' ? Date.now() + SESSION_TTL_MS : session.expiresAt } } await saveDb(db); return json(res, 200, { user: publicUser(user) }) }
+    if (req.method === 'PATCH' && url.pathname === '/api/profile') { const body = await readBody(req); const oldEmail = user.email; const email = normalizeEmail(body.email || oldEmail); const name = sanitizeText(body.name || user.name, 120); if (!/^\S+@\S+\.\S+$/.test(email) || !name) return json(res, 400, { error: 'A valid email and name are required' }); if (email !== oldEmail && db.users[email]) return json(res, 409, { error: 'That email is already in use' }); delete db.users[oldEmail]; user.email = email; user.name = name; db.users[email] = user; if (db.notifications[oldEmail]) { db.notifications[email] = db.notifications[oldEmail]; delete db.notifications[oldEmail] } for (const [token, session] of Object.entries(db.sessions)) { const sessionEmail = typeof session === 'string' ? session : session.email; if (sessionEmail === oldEmail) db.sessions[token] = { email, expiresAt: typeof session === 'string' ? Date.now() + SESSION_TTL_MS : session.expiresAt } } saveDb(db).catch((error) => console.warn(`Preference persistence warning: ${error.message}`)); return json(res, 200, { user: publicUser(user) }) }
     if (req.method === 'GET' && url.pathname === '/api/notifications/status') return json(res, 200, { email: mailStatus(), sms: smsStatus() }, allowedOrigin)
     if (req.method === 'POST' && url.pathname === '/api/notifications/test') {
       const body = await readBody(req)
