@@ -573,20 +573,19 @@ export const useAppStore = create((set, get) => ({
   },
 
   logout() {
-    const currentEmail = get().userEmail
-    const currentAccountWorkflows = get().workflows || []
-    const currentNotifications = get().notifications || DEFAULT_NOTIFICATIONS
-    if (currentEmail) {
-      const accounts = getStoredAccounts()
-      saveStoredAccounts({
-        ...accounts,
-        [currentEmail]: {
-          ...(accounts[currentEmail] || {}),
-          name: get().userName || accounts[currentEmail]?.name || 'User',
-          workflows: currentAccountWorkflows,
-          notifications: currentNotifications,
-          emailNotifications: get().emailNotifications !== false,
-        },
+    const token = getApiToken()
+    if (token) apiRequest('/auth/logout', { method: 'POST', timeoutMs: 5000 }).catch(() => {})
+    setApiToken(null)
+    saveStoredSession(null)
+    const state = get()
+    saveAccountSnapshot(state.userEmail, state)
+    if (persistTimer) clearTimeout(persistTimer)
+    pendingPersistSnapshot = null
+    try {
+      if (typeof window !== 'undefined') window.localStorage.removeItem(STORAGE_KEY)
+    } catch {}
+    set({ ...getDefaultState(), isAuthenticated: false })
+  },
       })
     }
 
