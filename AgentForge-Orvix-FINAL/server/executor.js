@@ -63,12 +63,10 @@ export async function executeWorkflow(workflow, user, input = {}) {
       const instructions = node.data?.instructions || node.data?.subtitle || 'Complete this step.'
 
       if (node.data?.kind === 'trigger') {
-        if (/gmail|inbox|email/.test(instructions.toLowerCase()) && user?.googleOAuth) {
-          try {
-            context = { input, messages: await fetchGmailMessages(await accessTokenFor(user)) }
-          } catch {
-            context = input
-          }
+        const triggerInstructions = instructions.toLowerCase()
+        if (/gmail/.test(triggerInstructions)) {
+          if (!user?.googleOAuth) throw new Error('Gmail integration is unavailable. Provide the email content as the run input instead.')
+          context = { input, messages: await fetchGmailMessages(await accessTokenFor(user)) }
         } else {
           context = input
         }
