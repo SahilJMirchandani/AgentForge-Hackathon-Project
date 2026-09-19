@@ -120,10 +120,14 @@ export default function WorkflowEditor() {
     }
   }
 
-  function handleRun() {
+  async function handleRun() {
     clearError()
     setRunning(true)
-    runWorkflow(id, { input: runInput.trim() || workflow.prompt, onDone: () => setRunning(false) })
+    try {
+      await runWorkflow(id, { input: runInput.trim() || workflow.prompt })
+    } finally {
+      setRunning(false)
+    }
   }
 
   function handleSaveMeta() {
@@ -346,48 +350,51 @@ export default function WorkflowEditor() {
             Add Step
           </button>
 
-          {workflow.executionLog.length > 0 && (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-6">
-          <div className="bg-surface border border-border rounded-card shadow-card p-4">
-            <h3 className="text-sm font-semibold text-ink mb-3">Execution Log</h3>
-            <ul className="space-y-2 max-h-56 overflow-y-auto pr-1">
-              {workflow.executionLog.map((line, i) => (
-                <li key={i} className="flex items-start gap-2 text-xs">
-                  <CheckCircle2 size={14} className="text-success mt-0.5 shrink-0" />
-                  <span className="text-ink-soft">{line.text}</span>
-                  <span className="ml-auto text-ink-faint shrink-0">{line.time}</span>
-                </li>
-              ))}
-            </ul>
-            {workflow.status === 'Completed' && (
-              <div className="mt-3 px-3 py-2 rounded-control bg-success-light text-success text-xs font-medium">
-                Workflow completed successfully
+          {(workflow.executionLog.length > 0 || workflow.results || workflow.status === 'Running' || workflow.status === 'Failed') && (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-6">
+              <div className="bg-surface border border-border rounded-card shadow-card p-4">
+                <h3 className="text-sm font-semibold text-ink mb-3">Execution Log</h3>
+                {workflow.executionLog.length > 0 ? (
+                  <ul className="space-y-2 max-h-56 overflow-y-auto pr-1">
+                    {workflow.executionLog.map((line, i) => (
+                      <li key={i} className="flex items-start gap-2 text-xs">
+                        <CheckCircle2 size={14} className="text-success mt-0.5 shrink-0" />
+                        <span className="text-ink-soft">{line.text}</span>
+                        <span className="ml-auto text-ink-faint shrink-0">{line.time}</span>
+                      </li>
+                    ))}
+                  </ul>
+                ) : (
+                  <p className="text-xs text-ink-soft">{workflow.status === 'Running' ? 'Workflow is running…' : 'No execution steps were recorded.'}</p>
+                )}
+                {workflow.status === 'Completed' && <div className="mt-3 px-3 py-2 rounded-control bg-success-light text-success text-xs font-medium">Workflow completed successfully</div>}
+                {workflow.status === 'Failed' && lastError && <div className="mt-3 px-3 py-2 rounded-control bg-danger-light text-danger text-xs font-medium break-words">{lastError}</div>}
               </div>
-            )}
-          </div>
-
-          <div className="bg-surface border border-border rounded-card shadow-card p-4">
-            <h3 className="text-sm font-semibold text-ink mb-3">Results</h3>
-            {workflow.results ? (
-              <div className="space-y-2">
-                {workflow.results.map((r) => {
-                  const Icon = RESULT_ICONS[r.icon] || CheckCircle2
-                  return (
-                    <div key={r.label} className="flex items-center gap-3 p-2.5 rounded-control bg-canvas">
-                      <div className="w-8 h-8 rounded-lg bg-primary-light text-primary flex items-center justify-center shrink-0">
-                        <Icon size={14} />
-                      </div>
-                      <span className="text-xs text-ink-soft flex-1">{r.label}</span>
-                      <span className="text-sm font-semibold text-ink">{r.value}</span>
-                    </div>
-                  )
-                })}
+              <div className="bg-surface border border-border rounded-card shadow-card p-4 min-w-0">
+                <h3 className="text-sm font-semibold text-ink mb-3">Results</h3>
+                {workflow.results?.length ? (
+                  <div className="space-y-2">
+                    {workflow.results.map((r, index) => {
+                      const Icon = RESULT_ICONS[r.icon] || (index === 0 ? Sparkles : CheckCircle2)
+                      const renderedValue = typeof r.value === 'string' ? r.value : JSON.stringify(r.value, null, 2)
+                      return (
+                        <div key={r.label || index} className="rounded-control bg-canvas p-3">
+                          <div className="flex items-center gap-2 mb-1.5">
+                            <div className="w-7 h-7 rounded-lg bg-primary-light text-primary flex items-center justify-center shrink-0"><Icon size={13} /></div>
+                            <span className="text-xs font-semibold text-ink">{r.label}</span>
+                          </div>
+                          <pre className="whitespace-pre-wrap break-words text-xs leading-5 text-ink-soft max-h-64 overflow-auto">{renderedValue}</pre>
+                        </div>
+                      )
+                    })}
+                  </div>
+                ) : workflow.status === 'Running' ? (
+                  <p className="text-xs text-ink-soft">Waiting for the agent to return its output…</p>
+                ) : (
+                  <p className="text-xs text-ink-soft">No output was returned for this run.</p>
+                )}
               </div>
-            ) : (
-              <p className="text-xs text-ink-soft">Results will appear here once the run finishes.</p>
-            )}
-          </div>
-        </div>
+            </div>
           )}
         </>
       ) : (
