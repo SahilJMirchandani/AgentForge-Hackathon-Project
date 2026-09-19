@@ -26,6 +26,7 @@ export default function Sidebar({ mobileOpen = false, onClose = () => {} }) {
             key={to}
             to={to}
             end={end}
+            onClick={() => onClose()}
             className={({ isActive }) =>
               `flex items-center gap-3 px-3 py-2 rounded-control text-sm font-medium transition-colors ${
                 isActive
