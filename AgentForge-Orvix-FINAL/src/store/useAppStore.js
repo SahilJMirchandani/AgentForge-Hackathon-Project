@@ -578,7 +578,7 @@ export const useAppStore = create((set, get) => ({
     setApiToken(null)
     saveStoredSession(null)
     const state = get()
-    saveAccountSnapshot(state.userEmail, state)
+    saveStoredAccounts(state.users || {})
     if (persistTimer) clearTimeout(persistTimer)
     pendingPersistSnapshot = null
     try {
