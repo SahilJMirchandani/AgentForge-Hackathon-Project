@@ -644,7 +644,9 @@ function NotificationFields({ data, onChange, accountEmail, workflowName }) {
       const response = await apiRequest('/notifications/test', {
         method: 'POST',
         body: { channel, destination, workflowName },
-        timeoutMs: 12000,
+        // SMTP handshakes can take longer than normal API calls; keep the UI
+        // alive long enough to receive the server's real delivery result.
+        timeoutMs: 45000,
       })
       setTestState({ status: response.delivered ? 'sent' : 'simulated', message: response.message })
     } catch (error) {
