@@ -1,25 +1,37 @@
-import { Search, Bell } from 'lucide-react'
+import { Search, Bell, Menu } from 'lucide-react'
+import { useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { useAppStore } from '../store/useAppStore'
 
-export default function Topbar({ userName = 'User' }) {
+export default function Topbar({ userName = 'User', onMenu = () => {} }) {
   const notifications = useAppStore((s) => s.notifications)
   const isNotificationsOpen = useAppStore((s) => s.isNotificationsOpen)
   const toggleNotifications = useAppStore((s) => s.toggleNotifications)
   const markAllNotificationsRead = useAppStore((s) => s.markAllNotificationsRead)
+  const navigate = useNavigate()
+  const [query, setQuery] = useState('')
 
   const unreadCount = (notifications || []).filter((n) => !n.read).length
+  function submitSearch(event) {
+    event.preventDefault()
+    const value = query.trim()
+    if (value) navigate(`/agents?search=${encodeURIComponent(value)}`)
+  }
 
   return (
-    <header className="h-16 border-b border-border bg-surface flex items-center justify-between px-6 gap-4">
-      <div className="relative w-full max-w-sm">
+    <header className="min-h-16 border-b border-border bg-surface flex items-center justify-between px-3 sm:px-6 gap-3">
+      <button type="button" onClick={onMenu} className="lg:hidden inline-flex shrink-0 items-center justify-center w-9 h-9 rounded-control border border-border text-ink-soft hover:text-ink" aria-label="Open menu"><Menu size={18} /></button>
+      <form onSubmit={submitSearch} className="relative w-full max-w-sm">
         <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-ink-faint" />
         <input
           type="text"
-          placeholder="Search anything..."
+          value={query}
+          onChange={(event) => setQuery(event.target.value)}
+          placeholder="Search agents..."
           className="w-full pl-9 pr-3 py-2 text-sm rounded-control border border-border bg-canvas focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary"
         />
-      </div>
-      <div className="flex items-center gap-4 shrink-0">
+      </form>
+      <div className="flex items-center gap-2 sm:gap-4 shrink-0">
         <div className="relative">
           <button
             type="button"
@@ -71,7 +83,7 @@ export default function Topbar({ userName = 'User' }) {
           <div className="w-8 h-8 rounded-full bg-secondary-light text-secondary flex items-center justify-center text-xs font-semibold">
             {(userName || 'U').slice(0, 1).toUpperCase()}
           </div>
-          <span className="text-sm text-ink-soft">Hey, {userName}</span>
+          <span className="hidden sm:inline text-sm text-ink-soft">Hey, {userName}</span>
         </div>
       </div>
     </header>
