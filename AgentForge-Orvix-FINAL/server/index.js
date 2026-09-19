@@ -372,7 +372,7 @@ async function handle(req, res) {
       if (!owner) return json(res, 409, { error: 'This agent has no owner account to deliver results to' }, allowedOrigin)
       const run = await executeWorkflow(workflow, owner, input)
       notify(owner, run.status === 'Completed' ? 'Agent run completed' : 'Agent run failed', run.status === 'Completed' ? `${workflow.name} processed a webhook event.` : run.error)
-      await saveDb(db)
+      saveDb(db).catch((error) => console.warn(`Webhook result persistence warning: ${error.message}`))
       return json(res, run.status === 'Completed' ? 200 : 422, { run, workflow: publicWorkflow(workflow) }, allowedOrigin)
     }
     const user = requireUser(req, res); if (!user) return
