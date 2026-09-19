@@ -6,6 +6,14 @@ function escapeHtml(value) {
   return String(value ?? '').replace(/[&<>"']/g, (character) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[character]))
 }
 
+function hasResend() {
+  return Boolean(String(process.env.RESEND_API_KEY || '').trim())
+}
+
+function resendFrom() {
+  return process.env.RESEND_FROM || process.env.RESET_EMAIL_FROM || 'onboarding@resend.dev'
+}
+
 function getTransporter() {
   if (transporter) return transporter
   if (!process.env.SMTP_HOST || !process.env.SMTP_USER || !process.env.SMTP_PASSWORD) return null
@@ -27,14 +35,67 @@ export function resetTransporter() {
 }
 
 export function mailStatus() {
-  return { configured: Boolean(getTransporter()), from: process.env.RESET_EMAIL_FROM || process.env.SMTP_USER || null }
+  const resendConfigured = hasResend()
+  const smtpConfigured = Boolean(getTransporter())
+  return {
+    configured: resendConfigured || smtpConfigured,
+    provider: resendConfigured ? 'resend' : smtpConfigured ? 'smtp' : null,
+    from: resendConfigured ? resendFrom() : process.env.RESET_EMAIL_FROM || process.env.SMTP_USER || null,
+  }
+}
+
+async function sendViaResend({ to, subject, text, html }) {
+  if (!hasResend()) return null
+
+  const controller = new AbortController()
+  const timeout = setTimeout(() => controller.abort(), 12000)
+  try {
+    const response = await fetch('https://api.resend.com/emails', {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        authorization: `Bearer ${process.env.RESEND_API_KEY}`,
+      },
+      body: JSON.stringify({
+        from: resendFrom(),
+        to: [to],
+        subject,
+        text,
+        html,
+      }),
+      signal: controller.signal,
+    })
+
+    const payload = await response.json().catch(() => ({}))
+    if (!response.ok) {
+      const message = payload?.message || payload?.error || `Resend API request failed (${response.status})`
+      return { delivered: false, simulated: false, error: message }
+    }
+
+    return { delivered: true, simulated: false, error: null, messageId: payload?.id || null }
+  } catch (error) {
+    const message = error.name === 'AbortError'
+      ? 'Resend API request timed out'
+      : error.message || 'Resend API delivery failed'
+    return { delivered: false, simulated: false, error: message }
+  } finally {
+    clearTimeout(timeout)
+  }
 }
 
 export async function sendPasswordResetEmail({ to, token }) {
-  const mailer = getTransporter()
   const appUrl = process.env.APP_URL || 'http://localhost:5173'
   const resetUrl = `${appUrl.replace(/\/$/, '')}/login?resetToken=${encodeURIComponent(token)}`
+  const subject = 'Reset your AgentForge password'
+  const text = `Reset your AgentForge password: ${resetUrl}\n\nThis link expires in 30 minutes. If you did not request it, you can ignore this email.`
+  const html = `<p>Reset your AgentForge password by clicking the link below.</p><p><a href="${resetUrl}">Reset password</a></p><p>This link expires in 30 minutes. If you did not request it, you can ignore this email.</p>`
 
+  if (hasResend()) {
+    const result = await sendViaResend({ to, subject, text, html })
+    return result?.delivered ? result : result
+  }
+
+  const mailer = getTransporter()
   if (!mailer) {
     console.log(`[Dev Mailer] Password reset link for ${to}: ${resetUrl}`)
     return true
@@ -44,9 +105,9 @@ export async function sendPasswordResetEmail({ to, token }) {
     await mailer.sendMail({
       from: process.env.RESET_EMAIL_FROM || process.env.SMTP_USER,
       to,
-      subject: 'Reset your AgentForge password',
-      text: `Reset your AgentForge password: ${resetUrl}\n\nThis link expires in 30 minutes. If you did not request it, you can ignore this email.`,
-      html: `<p>Reset your AgentForge password by clicking the link below.</p><p><a href="${resetUrl}">Reset password</a></p><p>This link expires in 30 minutes. If you did not request it, you can ignore this email.</p>`,
+      subject,
+      text,
+      html,
     })
     return { delivered: true, simulated: false, error: null }
   } catch (error) {
@@ -77,17 +138,23 @@ function renderHtml({ agentName, results, subject }) {
 /**
  * Sends an agent result email.
  *
- * Returns `{ delivered, simulated, error }` rather than a bare boolean, so the
- * executor can distinguish "sent", "logged to console because SMTP is not
- * configured", and "SMTP rejected it". Previously this always returned true,
- * which made every run claim a successful delivery.
+ * Resend's HTTPS API is preferred when RESEND_API_KEY is configured. This is
+ * important for Render Free services, where outbound SMTP ports are blocked.
+ * SMTP remains available for local development and paid hosts.
  */
 export async function sendWorkflowEmail({ to, workflow, subject }) {
-  const mailer = getTransporter()
   const results = (workflow?.results || []).map((result) => `${result.label}: ${result.value}`).join('\n') || 'The workflow completed successfully.'
   const agentName = workflow?.name || 'Agent'
   const resolvedSubject = subject || `Workflow completed: ${agentName}`
+  const text = `${agentName} completed successfully.\n\n${results}`
+  const html = renderHtml({ agentName, results, subject: resolvedSubject })
 
+  if (hasResend()) {
+    const result = await sendViaResend({ to, subject: resolvedSubject, text, html })
+    if (result) return result
+  }
+
+  const mailer = getTransporter()
   if (!mailer) {
     console.log(`[Dev Mailer] Simulated email delivery to ${to}: ${resolvedSubject}\n${results}`)
     return { delivered: false, simulated: true, error: null }
@@ -98,8 +165,8 @@ export async function sendWorkflowEmail({ to, workflow, subject }) {
       from: process.env.RESET_EMAIL_FROM || process.env.SMTP_USER,
       to,
       subject: resolvedSubject,
-      text: `${agentName} completed successfully.\n\n${results}`,
-      html: renderHtml({ agentName, results, subject: resolvedSubject }),
+      text,
+      html,
     })
     return { delivered: true, simulated: false, error: null }
   } catch (error) {
