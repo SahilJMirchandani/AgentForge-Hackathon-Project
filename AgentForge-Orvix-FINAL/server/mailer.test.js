@@ -71,3 +71,42 @@ describe('workflow email delivery', () => {
     expect(result).toEqual({ delivered: false, simulated: true, error: null })
   })
 })
+
+describe('Resend HTTPS delivery', () => {
+  beforeEach(() => {
+    vi.resetModules()
+    vi.stubEnv('RESEND_API_KEY', 're_test_key')
+    vi.stubEnv('RESEND_FROM', 'onboarding@resend.dev')
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({ id: 'resend-test-id' }),
+    }))
+  })
+
+  afterEach(() => {
+    vi.unstubAllEnvs()
+    vi.unstubAllGlobals()
+    vi.clearAllMocks()
+  })
+
+  it('sends workflow output through the HTTPS email API', async () => {
+    const { sendWorkflowEmail } = await import('./mailer.js')
+
+    const result = await sendWorkflowEmail({
+      to: 'user@example.com',
+      subject: 'AgentForge test notification',
+      workflow: {
+        name: 'Test notification',
+        results: [{ label: 'Status', value: 'HTTPS delivery works.' }],
+      },
+    })
+
+    expect(fetch).toHaveBeenCalledWith('https://api.resend.com/emails', expect.objectContaining({
+      method: 'POST',
+      headers: expect.objectContaining({
+        authorization: 'Bearer re_test_key',
+      }),
+    }))
+    expect(result).toMatchObject({ delivered: true, simulated: false, error: null })
+  })
+})
