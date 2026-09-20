@@ -32,10 +32,12 @@ Without `MONGODB_URI`, application data is stored in
 `server/data/agentforge.json` for local development. Copy `.env.example` to
 `.env` and set `GEMINI_API_KEY` to enable Gemini generation and sandbox
 evaluation. Set `MONGODB_URI` and `MONGODB_DB` to use MongoDB persistence;
-`npm run migrate:mongodb` imports existing file data. SMTP settings enable
-real password-reset and agent-result emails; `TWILIO_ACCOUNT_SID`,
-`TWILIO_AUTH_TOKEN` and `TWILIO_FROM_NUMBER` enable SMS notifications. Google OAuth settings enable Google sign-in, and Slack webhook URLs can be configured on output
-nodes. Set `OAUTH_ENCRYPTION_KEY` in production to protect provider tokens.
+`npm run migrate:mongodb` imports existing file data. Resend is the preferred
+email provider for deployed services; configure `RESEND_API_KEY` and
+`RESEND_FROM`. SMTP remains available as a fallback for local development.
+`TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN` and `TWILIO_FROM_NUMBER` enable
+SMS notifications. Google OAuth settings enable Google sign-in, and Slack
+webhook URLs can be configured on output nodes.
 Deployed agents with schedule triggers are executed by the server scheduler.
 Set `PORT`, `HOST`, `CLIENT_ORIGIN`, `API_PUBLIC_URL`, or `VITE_API_URL` to
 override defaults. Set `API_PUBLIC_URL` to the public API origin whenever the
@@ -73,8 +75,8 @@ single scheduler instance unless a distributed lock is added.
 ## Checking your configuration
 
 ```bash
-npm run doctor                      # check SMTP, Gemini and Twilio
-npm run doctor -- you@gmail.com     # also send a real test email
+npm run doctor                      # check configured external services
+npm run doctor -- you@gmail.com     # also send a real SMTP test email
 ```
 
 Each check makes a real request and prints what came back, including which
@@ -82,7 +84,9 @@ Gemini models your key can actually use and whether your Twilio number is
 SMS-capable. Run it after editing `.env`; a misconfiguration shows up here
 instead of surfacing later as a silently simulated notification.
 
-Google sign-in has a demo mode for local development that skips the OAuth handshake and returns a fixed account. It is only active when `ALLOW_DEMO_OAUTH=true`, and never in production.
+Google sign-in has a demo mode for local development that skips the OAuth
+handshake and returns a fixed account. It is only active when
+`ALLOW_DEMO_OAUTH=true`, and never in production.
 
 ## Notifications
 
@@ -108,8 +112,8 @@ Validation is shared between the browser and the server
 (`src/utils/notify.js`), so a destination accepted in the editor is never
 rejected at run time. The node panel has a **Send test notification** button
 (`POST /api/notifications/test`) to confirm an address works before deploying,
-and `GET /api/notifications/status` reports whether SMTP and SMS are actually
-configured.
+and `GET /api/notifications/status` reports whether email and SMS delivery
+providers are configured.
 
 Delivery results are honest: a run reports `delivered`, `simulated` (the
 provider is not configured, so the message was written to the server log), or
@@ -117,18 +121,21 @@ provider is not configured, so the message was written to the server log), or
 recipient typed on a node is always honoured, even when the Settings toggle is
 off.
 
-For Gmail SMTP, `SMTP_PASSWORD` must be a 16-character App Password, not the
-account password, and 2-Step Verification must be on.
+For local Gmail SMTP, `SMTP_PASSWORD` must be a 16-character App Password,
+not the account password, and 2-Step Verification must be on. For deployed
+Render Free services, use the Resend HTTPS API instead of direct SMTP.
 
 ## Backend API
 
 The built-in Node backend provides password hashing, bearer sessions, account
 creation/login/password reset confirmation, workflow CRUD, Gemini generation and
 execution, tokenized webhook deployment, sandbox scoring, execution history,
-notifications, profile updates, preferences, MongoDB persistence, SMTP email,
-and IP-based rate limiting. A deployed agent accepts `POST` JSON payloads at
+notifications, profile updates, preferences, MongoDB persistence, email
+delivery (Resend HTTPS with SMTP fallback), and IP-based rate limiting. A
+deployed agent accepts `POST` JSON payloads at
 `/api/hooks/:token`; the token is shown in the workflow editor after deployment.
-Google sign-in uses `/api/auth/google` and requires the callback URL configured in Google Cloud Console to match `GOOGLE_AUTH_REDIRECT_URI`.
+Google sign-in uses `/api/auth/google` and requires the callback URL configured
+in Google Cloud Console to match `GOOGLE_AUTH_REDIRECT_URI`.
 The frontend store synchronizes authenticated workflow mutations to the API.
 `GET /api/health` is a liveness check and `GET /api/ready` is the deployment
 readiness check. The Gemini, MongoDB, and SMTP credentials are read only by the
@@ -140,9 +147,9 @@ Build the frontend with `npm run build`, run the API with `npm start`, and put
 Caddy in front using `deploy/Caddyfile`. Point DNS for the configured domain
 to the server; Caddy terminates HTTPS and renews certificates automatically.
 Set `TRUST_PROXY=true` when using a trusted reverse proxy so rate limiting can
-use the forwarded client address. In production, MongoDB and
-`OAUTH_ENCRYPTION_KEY` are required; the API fails closed instead of silently
-using local file storage. Never expose port 4000 directly to the public internet.
+use the forwarded client address. In production, MongoDB is required; the API
+fails closed instead of silently using local file storage. Never expose port
+4000 directly to the public internet.
 The API exposes `/api/health` for liveness and `/api/ready` for readiness; use
 the latter for process managers and load balancers.
 
