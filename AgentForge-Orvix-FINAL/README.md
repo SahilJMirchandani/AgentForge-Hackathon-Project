@@ -33,8 +33,9 @@ Without `MONGODB_URI`, application data is stored in
 `.env` and set `GEMINI_API_KEY` to enable Gemini generation and sandbox
 evaluation. Set `MONGODB_URI` and `MONGODB_DB` to use MongoDB persistence;
 `npm run migrate:mongodb` imports existing file data. Resend is the preferred
-email provider for deployed services; configure `RESEND_API_KEY` and
-`RESEND_FROM`. SMTP remains available as a fallback for local development.
+email provider for deployed services; configure `BREVO_API_KEY` and a
+verified `BREVO_FROM` sender. Resend remains available as a fallback, while
+SMTP is available for local development.
 `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN` and `TWILIO_FROM_NUMBER` enable
 SMS notifications. Google OAuth settings enable Google sign-in, and Slack
 webhook URLs can be configured on output nodes.
@@ -76,7 +77,7 @@ single scheduler instance unless a distributed lock is added.
 
 ```bash
 npm run doctor                      # check configured external services
-npm run doctor -- you@gmail.com     # also send a real SMTP test email
+npm run doctor -- you@gmail.com     # send a real SMTP fallback test email
 ```
 
 Each check makes a real request and prints what came back, including which
@@ -121,9 +122,12 @@ provider is not configured, so the message was written to the server log), or
 recipient typed on a node is always honoured, even when the Settings toggle is
 off.
 
-For local Gmail SMTP, `SMTP_PASSWORD` must be a 16-character App Password,
-not the account password, and 2-Step Verification must be on. For deployed
-Render Free services, use the Resend HTTPS API instead of direct SMTP.
+For deployed Render Free services, Brevo's HTTPS API is preferred. The
+`BREVO_FROM` address must be verified in Brevo before it can be used as the
+sender. Resend remains available as a fallback, but its test sender can be
+restricted to the account owner's address. For local Gmail SMTP,
+`SMTP_PASSWORD` must be a 16-character App Password, not the account
+password, and 2-Step Verification must be on.
 
 ## Backend API
 
@@ -138,7 +142,7 @@ Google sign-in uses `/api/auth/google` and requires the callback URL configured
 in Google Cloud Console to match `GOOGLE_AUTH_REDIRECT_URI`.
 The frontend store synchronizes authenticated workflow mutations to the API.
 `GET /api/health` is a liveness check and `GET /api/ready` is the deployment
-readiness check. The Gemini, MongoDB, and SMTP credentials are read only by the
+readiness check. The Gemini, MongoDB, email-provider, and SMTP credentials are read only by the
 server and are never sent to the browser.
 
 ## Production deployment
