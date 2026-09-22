@@ -185,6 +185,12 @@ export async function executeWorkflow(workflow, user, input = {}) {
           break
         }
       } else if (outputKinds.has(node.data?.kind)) {
+        if (run.skipNotifications) {
+          step.output = { skipped: true, reason: 'No new Gmail messages arrived during this poll.' }
+          step.status = 'Completed'
+          step.completedAt = Date.now()
+          continue
+        }
         const channel = resolveChannel(node.data?.channel, workflow.prompt)
 
         // The account-level preference only gates notifications sent to the
