@@ -103,7 +103,7 @@ async function sendViaBrevo({ to, subject, text, html }) {
   }
 }
 
-async function sendViaResend({ to, subject, text, html })
+async function sendViaResend({ to, subject, text, html }) {
   if (!hasResend()) return null
 
   const controller = new AbortController()
