@@ -299,7 +299,10 @@ async function handle(req, res) {
       const state = db.oauthStates[stateKey]
       const errorParam = url.searchParams.get('error')
       if (errorParam) {
-        res.writeHead(302, { location: `${CLIENT_ORIGIN.replace(/\/$/, '')}/login?error=${encodeURIComponent('Google sign-in was cancelled')}` })
+        const cancelledDestination = state?.type === 'gmail'
+          ? '/settings?gmail=error'
+          : '/login?error=' + encodeURIComponent('Google sign-in was cancelled')
+        res.writeHead(302, { location: CLIENT_ORIGIN.replace(/\/$/, '') + cancelledDestination })
         return res.end()
       }
       if (!state || state.expiresAt <= Date.now() || !['login', 'gmail'].includes(state.type)) {
@@ -352,8 +355,11 @@ async function handle(req, res) {
         res.writeHead(302, { location: `${CLIENT_ORIGIN.replace(/\/$/, '')}/login?token=${encodeURIComponent(token)}` })
         return res.end()
       } catch (error) {
-        console.error(`Google Auth Callback Error: ${error.message}`)
-        res.writeHead(302, { location: `${CLIENT_ORIGIN.replace(/\/$/, '')}/login?error=${encodeURIComponent(error.message || 'Google sign-in failed')}` })
+        console.error('Google Auth Callback Error:', error.message)
+        const failureDestination = state.type === 'gmail'
+          ? '/settings?gmail=error'
+          : '/login?error=' + encodeURIComponent(error.message || 'Google sign-in failed')
+        res.writeHead(302, { location: CLIENT_ORIGIN.replace(/\/$/, '') + failureDestination })
         return res.end()
       }
     }
