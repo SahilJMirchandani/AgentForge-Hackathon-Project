@@ -72,6 +72,46 @@ describe('workflow email delivery', () => {
   })
 })
 
+describe('Brevo HTTPS delivery', () => {
+  beforeEach(() => {
+    vi.resetModules()
+    vi.stubEnv('BREVO_API_KEY', 'xkeysib-test')
+    vi.stubEnv('BREVO_FROM', 'sahil@example.com')
+    vi.stubEnv('BREVO_FROM_NAME', 'AgentForge')
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({ messageId: '<brevo-test-id>' }),
+    }))
+  })
+
+  afterEach(() => {
+    vi.unstubAllEnvs()
+    vi.unstubAllGlobals()
+    vi.clearAllMocks()
+  })
+
+  it('sends workflow output through Brevo HTTPS delivery', async () => {
+    const { sendWorkflowEmail } = await import('./mailer.js')
+
+    const result = await sendWorkflowEmail({
+      to: 'judge@example.com',
+      subject: 'AgentForge test notification',
+      workflow: {
+        name: 'Test notification',
+        results: [{ label: 'Status', value: 'Brevo delivery works.' }],
+      },
+    })
+
+    expect(fetch).toHaveBeenCalledWith('https://api.brevo.com/v3/smtp/email', expect.objectContaining({
+      method: 'POST',
+      headers: expect.objectContaining({
+        'api-key': 'xkeysib-test',
+      }),
+    }))
+    expect(result).toMatchObject({ delivered: true, simulated: false, error: null })
+  })
+})
+
 describe('Resend HTTPS delivery', () => {
   beforeEach(() => {
     vi.resetModules()
