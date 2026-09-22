@@ -33,6 +33,50 @@ function valueText(value) {
   return JSON.stringify(value, null, 2)
 }
 
+function parseStructuredString(value) {
+  const text = String(value ?? '').trim()
+  if (!text || !/^[{[]/.test(text)) return null
+  try { return JSON.parse(text) } catch { return null }
+}
+
+function formatResultValue(value) {
+  if (value === null || value === undefined) return ''
+  if (typeof value === 'string') {
+    const parsed = parseStructuredString(value)
+    if (parsed !== null) return formatResultValue(parsed)
+    return value.trim()
+  }
+  if (Array.isArray(value)) {
+    return value.map((item) => formatResultValue(item)).filter(Boolean).map((item) => `• ${item.replace(/^•\\s*/, '')}`).join('\n')
+  }
+  if (typeof value === 'object') {
+    const preferred = ['summary', 'result', 'output', 'answer', 'message', 'text', 'content']
+    for (const key of preferred) {
+      if (value[key] !== undefined && value[key] !== null && String(value[key]).trim() !== '') return formatResultValue(value[key])
+    }
+    return Object.entries(value)
+      .filter(([key]) => !['completed', 'status'].includes(key))
+      .map(([key, nested]) => {
+        const label = key.replace(/([A-Z])/g, ' $1').replace(/^./, (char) => char.toUpperCase())
+        const rendered = formatResultValue(nested)
+        return rendered ? `${label}: ${rendered}` : ''
+      })
+      .filter(Boolean)
+      .join('\n')
+  }
+  return String(value)
+}
+
+function formatIstTime(timestamp = Date.now()) {
+  return new Intl.DateTimeFormat('en-IN', {
+    timeZone: 'Asia/Kolkata',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+    hour12: true,
+  }).format(new Date(timestamp))
+}
+
 function conditionMatches(instructions, context) {
   const instructionText = instructions.toLowerCase()
   const text = valueText(context).toLowerCase()
@@ -92,9 +136,9 @@ export async function executeWorkflow(workflow, user, input = {}) {
         context = await runAgentStep({ instructions, input: context, workflow })
       } else if (node.data?.kind === 'condition') {
         const matched = conditionMatches(instructions, context)
-        context = { input: context, condition: instructions, evaluated: matched }
+        step.output = { condition: instructions, evaluated: matched }
         if (!matched) {
-          step.output = context
+          context = formatResultValue(context)
           step.status = 'Completed'
           step.completedAt = Date.now()
           break
@@ -123,7 +167,9 @@ export async function executeWorkflow(workflow, user, input = {}) {
           run.notifications.push(step.output)
         }
       } else {
-        context = { input: context, action: instructions, completed: true }
+        // Descriptive action steps should not replace the useful workflow payload
+        // with nested implementation JSON.
+        step.output = { action: instructions, completed: true }
       }
 
       step.status = 'Completed'
@@ -139,9 +185,10 @@ export async function executeWorkflow(workflow, user, input = {}) {
     workflow.nodes = (workflow.nodes || []).map((node) => ({ ...node, data: { ...node.data, status: 'completed' } }))
     workflow.startedAt = startedAt
     workflow.duration = run.duration
-    workflow.results = [{ label: 'Agent output', value: valueText(context) }]
-    workflow.executionLog = run.steps.map((step) => ({ time: new Date(step.completedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }), text: notificationLogLine(step) }))
-    workflow.executionLog.push({ time: new Date(run.completedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }), text: 'Agent completed successfully' })
+    workflow.completedAt = run.completedAt
+    workflow.results = [{ label: 'Agent output', value: formatResultValue(context), icon: 'Sparkles' }]
+    workflow.executionLog = run.steps.map((step) => ({ time: formatIstTime(step.completedAt), text: notificationLogLine(step) }))
+    workflow.executionLog.push({ time: formatIstTime(run.completedAt), text: 'Agent completed successfully' })
     workflow.executionHistory = [{ id: run.id, status: run.status, startedAt, completedAt: run.completedAt, duration: run.duration }, ...(workflow.executionHistory || [])].slice(0, 50)
   } catch (error) {
     run.status = 'Failed'
@@ -151,9 +198,10 @@ export async function executeWorkflow(workflow, user, input = {}) {
     if (run.steps.length) run.steps[run.steps.length - 1].status = 'Failed'
     workflow.nodes = (workflow.nodes || []).map((node) => ({ ...node, data: { ...node.data, status: node.id === failedNodeId ? 'failed' : node.data?.status } }))
     workflow.status = 'Failed'
+    workflow.completedAt = run.completedAt
     workflow.results = [
-      { label: 'Run error', value: run.error },
-      { label: 'Latest available output', value: valueText(context) },
+      { label: 'Run error', value: run.error, icon: 'AlertTriangle' },
+      { label: 'Latest available output', value: formatResultValue(context), icon: 'Sparkles' },
     ]
     run.output = context
     workflow.executionHistory = [{ id: run.id, status: run.status, startedAt, completedAt: run.completedAt, error: run.error }, ...(workflow.executionHistory || [])].slice(0, 50)
