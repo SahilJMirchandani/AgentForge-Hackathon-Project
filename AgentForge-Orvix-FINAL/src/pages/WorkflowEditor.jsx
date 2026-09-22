@@ -62,6 +62,7 @@ export default function WorkflowEditor() {
   const updateNodeData = useAppStore((s) => s.updateNodeData)
   const updateEdges = useAppStore((s) => s.updateEdges)
   const addStep = useAppStore((s) => s.addStep)
+  const deleteWorkflowNode = useAppStore((s) => s.deleteWorkflowNode)
   const saveWorkflow = useAppStore((s) => s.saveWorkflow)
   const runWorkflow = useAppStore((s) => s.runWorkflow)
   const updateWorkflowMeta = useAppStore((s) => s.updateWorkflowMeta)
@@ -160,6 +161,18 @@ export default function WorkflowEditor() {
     updateNodeData(id, selectedNodeId, updates)
     setNodeSaveStatus('Saved')
     window.setTimeout(() => setNodeSaveStatus(''), 1600)
+  }
+
+  function handleAddStep() {
+    const nodeId = addStep(id)
+    if (nodeId) setSelectedNodeId(nodeId)
+  }
+
+  function handleDeleteStep() {
+    const node = workflow.nodes.find((item) => item.id === selectedNodeId)
+    if (!node?.data?.userAdded) return
+    deleteWorkflowNode(id, selectedNodeId)
+    setSelectedNodeId(null)
   }
 
   return (
@@ -338,12 +351,13 @@ export default function WorkflowEditor() {
               saveStatus={nodeSaveStatus}
               accountEmail={userEmail}
               workflowName={workflow.name}
+              onDelete={workflow.nodes.find((node) => node.id === selectedNodeId)?.data?.userAdded ? handleDeleteStep : null}
             />
           </div>
 
           <button
             type="button"
-            onClick={() => addStep(id)}
+            onClick={handleAddStep}
             className="mt-3 self-start inline-flex items-center gap-1.5 px-3 py-2 rounded-control border border-dashed border-border text-sm text-ink-soft hover:border-primary hover:text-primary transition-colors"
           >
             <Plus size={15} />
@@ -474,7 +488,7 @@ function WebhookPanel({ token }) {
   )
 }
 
-function NodeConfigPanel({ node, onChange, onClose, saveStatus, accountEmail, workflowName }) {
+function NodeConfigPanel({ node, onChange, onClose, saveStatus, accountEmail, workflowName, onDelete }) {
   if (!node) {
     return (
       <div className="min-h-[220px] bg-surface border border-dashed border-border rounded-card p-5 flex flex-col items-center justify-center text-center">
@@ -500,6 +514,13 @@ function NodeConfigPanel({ node, onChange, onClose, saveStatus, accountEmail, wo
         </div>
         <button type="button" onClick={onClose} className="text-xs text-ink-soft hover:text-ink">Close</button>
       </div>
+
+      {onDelete && (
+        <button type="button" onClick={onDelete} className="mb-3 inline-flex w-full items-center justify-center gap-1.5 rounded-control border border-danger/30 bg-danger-light px-3 py-2 text-xs font-medium text-danger hover:opacity-80">
+          <Trash2 size={13} />
+          Delete this step
+        </button>
+      )}
 
       <div className="space-y-3">
         <Field label="Title" value={data.title} onChange={(value) => onChange({ title: value })} />
