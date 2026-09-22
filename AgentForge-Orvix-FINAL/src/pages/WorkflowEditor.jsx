@@ -390,14 +390,14 @@ export default function WorkflowEditor() {
                   <div className="space-y-2">
                     {workflow.results.map((r, index) => {
                       const Icon = RESULT_ICONS[r.icon] || (index === 0 ? Sparkles : CheckCircle2)
-                      const renderedValue = typeof r.value === 'string' ? r.value : JSON.stringify(r.value, null, 2)
+                      const renderedValue = typeof r.value === 'string' ? r.value : String(r.value ?? '')
                       return (
                         <div key={r.label || index} className="rounded-control bg-canvas p-3">
                           <div className="flex items-center gap-2 mb-1.5">
                             <div className="w-7 h-7 rounded-lg bg-primary-light text-primary flex items-center justify-center shrink-0"><Icon size={13} /></div>
                             <span className="text-xs font-semibold text-ink">{r.label}</span>
                           </div>
-                          <pre className="whitespace-pre-wrap break-words text-xs leading-5 text-ink-soft max-h-64 overflow-auto">{renderedValue}</pre>
+                          <div className="whitespace-pre-wrap break-words text-sm leading-6 text-ink-soft max-h-64 overflow-auto">{renderedValue}</div>
                         </div>
                       )
                     })}
