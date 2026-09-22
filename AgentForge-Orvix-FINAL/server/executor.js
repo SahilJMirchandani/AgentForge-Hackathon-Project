@@ -134,7 +134,7 @@ export async function executeWorkflow(workflow, user, input = {}) {
         const triggerText = `${node.data?.title || ''} ${instructions}`.toLowerCase()
         const isGmailTrigger = /\bgmail\b|\binbox\b|new email.*arriv|email.*arriv/.test(triggerText)
         if (isGmailTrigger) {
-          if (!user?.gmailAccessToken) throw new Error('Connect Gmail with Google Sign-In before running this email agent.')
+          if (!user?.gmailAccessToken) throw new Error('Gmail integration is unavailable: connect Gmail with Google Sign-In before running this email agent.')
           if (user.gmailTokenExpiresAt && user.gmailTokenExpiresAt <= Date.now() + 60_000) {
             const refreshed = await refreshGoogleAccessToken(user.gmailRefreshToken)
             user.gmailAccessToken = refreshed.access_token
