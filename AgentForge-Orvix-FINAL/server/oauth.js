@@ -68,7 +68,7 @@ export function googleAuthLoginRedirectUri() {
   return redirectUri
 }
 
-export function googleAuthLoginUrl(state) {
+export function googleAuthLoginUrl(state, { gmail = false } = {}) {
   const { clientId } = config()
   if (!clientId) throw new Error('Google OAuth is not configured')
   const redirectUri = googleAuthLoginRedirectUri()
@@ -77,7 +77,7 @@ export function googleAuthLoginUrl(state) {
     client_id: clientId,
     redirect_uri: redirectUri,
     response_type: 'code',
-    scope: `openid email profile ${GMAIL_READONLY_SCOPE}`,
+    scope: gmail ? `openid email profile ${GMAIL_READONLY_SCOPE}` : 'openid email profile',
     state,
     access_type: 'offline',
     include_granted_scopes: 'true',
