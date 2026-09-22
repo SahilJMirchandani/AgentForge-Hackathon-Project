@@ -181,19 +181,50 @@ export async function sendPasswordResetEmail({ to, token }) {
   }
 }
 
+function renderResultHtml(results) {
+  return String(results || 'The workflow completed successfully.')
+    .split(/\n+/)
+    .map((line) => line.trim())
+    .filter(Boolean)
+    .map((line) => {
+      const bullet = line.replace(/^•\s*/, '')
+      if (bullet !== line) return `<li style="margin:0 0 6px">${escapeHtml(bullet)}</li>`
+      const separator = line.indexOf(': ')
+      if (separator > 0 && separator < 48) {
+        const label = line.slice(0, separator)
+        const value = line.slice(separator + 2)
+        return `<p style="margin:0 0 10px"><strong>${escapeHtml(label)}:</strong> ${escapeHtml(value)}</p>`
+      }
+      return `<p style="margin:0 0 10px">${escapeHtml(line)}</p>`
+    })
+    .join('')
+}
+
 function renderHtml({ agentName, results, subject }) {
+  const resultHtml = renderResultHtml(results)
+  const generatedAt = new Intl.DateTimeFormat('en-IN', {
+    timeZone: 'Asia/Kolkata',
+    dateStyle: 'medium',
+    timeStyle: 'short',
+  }).format(new Date())
+
   return `<!doctype html><html><body style="margin:0;padding:24px;background:#F5F7FA;font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;color:#1F2937">
-  <div style="max-width:560px;margin:0 auto;background:#FFFFFF;border:1px solid #E5E9F0;border-radius:12px;overflow:hidden">
+  <div style="max-width:600px;margin:0 auto;background:#FFFFFF;border:1px solid #E5E9F0;border-radius:12px;overflow:hidden">
     <div style="padding:20px 24px;background:#4F46E5;color:#FFFFFF">
       <p style="margin:0;font-size:12px;letter-spacing:.08em;text-transform:uppercase;opacity:.85">AgentForge</p>
-      <h1 style="margin:6px 0 0;font-size:18px;font-weight:600">${escapeHtml(subject)}</h1>
+      <h1 style="margin:6px 0 0;font-size:19px;font-weight:600">${escapeHtml(subject)}</h1>
     </div>
     <div style="padding:24px">
-      <p style="margin:0 0 12px;font-size:14px;color:#4B5563">Your agent <strong>${escapeHtml(agentName)}</strong> finished running. Here is what it produced:</p>
-      <pre style="margin:0;padding:14px;background:#F5F7FA;border:1px solid #E5E9F0;border-radius:8px;font-size:13px;line-height:1.5;white-space:pre-wrap;word-break:break-word;color:#1F2937">${escapeHtml(results)}</pre>
+      <p style="margin:0 0 10px;font-size:14px;color:#374151">Hello,</p>
+      <p style="margin:0 0 18px;font-size:14px;color:#4B5563">Your workflow <strong>${escapeHtml(agentName)}</strong> has completed successfully. The result is provided below.</p>
+      <div style="padding:16px 18px;background:#F8FAFC;border:1px solid #E5E9F0;border-radius:8px;font-size:14px;line-height:1.6;color:#1F2937">
+        ${resultHtml}
+      </div>
+      <p style="margin:18px 0 0;font-size:12px;color:#6B7280">Generated on ${escapeHtml(generatedAt)} IST.</p>
+      <p style="margin:20px 0 0;font-size:14px;color:#374151">Regards,<br><strong>AgentForge</strong></p>
     </div>
     <div style="padding:14px 24px;border-top:1px solid #E5E9F0;font-size:12px;color:#9CA3AF">
-      You are receiving this because this address is set as the notification recipient on this agent.
+      This message was generated automatically by your AgentForge workflow.
     </div>
   </div>
 </body></html>`
@@ -211,7 +242,22 @@ export async function sendWorkflowEmail({ to, workflow, subject }) {
   const results = (workflow?.results || []).map((result) => `${result.label}: ${result.value}`).join('\n') || 'The workflow completed successfully.'
   const agentName = workflow?.name || 'Agent'
   const resolvedSubject = subject || `Workflow completed: ${agentName}`
-  const text = `${agentName} completed successfully.\n\n${results}`
+  const generatedAt = new Intl.DateTimeFormat('en-IN', {
+    timeZone: 'Asia/Kolkata',
+    dateStyle: 'medium',
+    timeStyle: 'short',
+  }).format(new Date())
+  const text = `Hello,
+
+Your workflow "${agentName}" has completed successfully.
+
+Result:
+${results}
+
+Generated on ${generatedAt} IST.
+
+Regards,
+AgentForge`
   const html = renderHtml({ agentName, results, subject: resolvedSubject })
 
   if (hasBrevo()) {
