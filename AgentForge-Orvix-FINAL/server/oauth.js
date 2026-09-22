@@ -68,7 +68,7 @@ export function googleAuthLoginRedirectUri() {
   return redirectUri
 }
 
-export function googleAuthLoginUrl(state, { gmail = false } = {}) {
+export function googleAuthLoginUrl(state, { gmail = false, email = '' } = {}) {
   const { clientId } = config()
   if (!clientId) throw new Error('Google OAuth is not configured')
   const redirectUri = googleAuthLoginRedirectUri()
@@ -81,7 +81,8 @@ export function googleAuthLoginUrl(state, { gmail = false } = {}) {
     state,
     access_type: 'offline',
     include_granted_scopes: 'true',
-    prompt: 'consent select_account',
+    ...(String(email || '').trim() ? { login_hint: String(email).trim() } : {}),
+    prompt: gmail ? 'consent select_account' : 'select_account',
   })
   return `${GOOGLE_AUTH_URL}?${params}`
 }
