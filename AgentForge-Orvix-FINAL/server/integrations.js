@@ -75,21 +75,21 @@ function extractGmailBody(payload) {
   return ''
 }
 
-export async function fetchGmailMessages(accessToken, limit = 10) {
+export async function fetchGmailMessages(accessToken, limit = 10, query = 'is:unread') {
   if (!accessToken) throw new Error('Connect Google Gmail before running an email agent')
   const fetchGmail = async (url) => {
     const controller = new AbortController()
     const timeout = setTimeout(() => controller.abort(), 15000)
     try { return await fetch(url, { headers: { authorization: `Bearer ${accessToken}` }, signal: controller.signal }) } finally { clearTimeout(timeout) }
   }
-  const response = await fetchGmail(`https://gmail.googleapis.com/gmail/v1/users/me/messages?maxResults=${Math.min(20, Math.max(1, limit))}&q=is%3Aunread`)
+  const response = await fetchGmail(`https://gmail.googleapis.com/gmail/v1/users/me/messages?maxResults=${Math.min(20, Math.max(1, limit))}&q=${encodeURIComponent(query)}`)
   if (!response.ok) throw new Error(`Gmail request failed (${response.status})`)
   const listing = await response.json()
   const messages = await Promise.all((listing.messages || []).slice(0, limit).map(async ({ id }) => {
     const messageResponse = await fetchGmail(`https://gmail.googleapis.com/gmail/v1/users/me/messages/${encodeURIComponent(id)}?format=full`)
     if (!messageResponse.ok) throw new Error(`Gmail message request failed (${messageResponse.status})`)
     const message = await messageResponse.json()
-    return { id: message.id, snippet: message.snippet || '', body: extractGmailBody(message.payload) || message.snippet || '', headers: message.payload?.headers || [] }
+    return { id: message.id, internalDate: message.internalDate || null, snippet: message.snippet || '', body: extractGmailBody(message.payload) || message.snippet || '', headers: message.payload?.headers || [] }
   }))
   return messages
 }
