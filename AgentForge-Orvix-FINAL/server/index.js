@@ -74,7 +74,7 @@ const json = (res, status, body, origin, extraHeaders = {}) => {
   res.writeHead(status, { ...headers, ...extraHeaders })
   res.end(JSON.stringify(body))
 }
-const publicUser = (user) => (user ? { id: user.id, name: user.name, email: user.email, emailNotifications: user.emailNotifications !== false } : null)
+const publicUser = (user) => (user ? { id: user.id, name: user.name, email: user.email, emailNotifications: user.emailNotifications !== false, gmailConnected: Boolean(user.gmailRefreshToken || user.gmailAccessToken) } : null)
 const publicWorkflow = (workflow) => { if (!workflow || typeof workflow !== 'object') return null; const { userId, ...safeWorkflow } = workflow; return safeWorkflow }
 const hashPassword = (password, salt = randomBytes(16).toString('hex')) => ({ passwordSalt: salt, passwordHash: scryptSync(password, salt, 64).toString('hex') })
 const validPassword = (password, user) => { if (!user?.passwordSalt || !user?.passwordHash) return false; const actual = scryptSync(password, user.passwordSalt, 64); const expected = Buffer.from(user.passwordHash, 'hex'); return actual.length === expected.length && timingSafeEqual(actual, expected) }
@@ -284,6 +284,16 @@ async function handle(req, res) {
       })
       return res.end()
     }
+    if (req.method === 'POST' && url.pathname === '/api/auth/google/gmail') {
+      const user = requireUser(req, res)
+      if (!user) return
+      if (!googleConfigured()) return json(res, 503, { error: 'Google OAuth is not configured on the server.' }, allowedOrigin)
+      const state = randomBytes(24).toString('hex')
+      db.oauthStates[state] = { type: 'gmail', email: user.email, expiresAt: Date.now() + 10 * 60 * 1000 }
+      const googleUrl = googleAuthLoginUrl(state, { gmail: true })
+      saveDb(db).catch((error) => console.warn(`Gmail OAuth state persistence warning: ${error.message}`))
+      return json(res, 200, { url: googleUrl }, allowedOrigin)
+    }
     if (req.method === 'GET' && url.pathname === '/api/auth/google/callback') {
       const stateKey = url.searchParams.get('state')
       const state = db.oauthStates[stateKey]
@@ -292,7 +302,7 @@ async function handle(req, res) {
         res.writeHead(302, { location: `${CLIENT_ORIGIN.replace(/\/$/, '')}/login?error=${encodeURIComponent('Google sign-in was cancelled')}` })
         return res.end()
       }
-      if (!state || state.expiresAt <= Date.now() || state.type !== 'login') {
+      if (!state || state.expiresAt <= Date.now() || !['login', 'gmail'].includes(state.type)) {
         res.writeHead(302, { location: `${CLIENT_ORIGIN.replace(/\/$/, '')}/login?error=${encodeURIComponent('Google authentication state is invalid or expired')}` })
         return res.end()
       }
@@ -300,6 +310,19 @@ async function handle(req, res) {
         const code = url.searchParams.get('code')
         if (!code) throw new Error('Authorization code missing from Google callback')
         const tokenResult = await exchangeGoogleAuthCode(code)
+
+        if (state.type === 'gmail') {
+          const user = db.users[state.email]
+          if (!user) throw new Error('Your AgentForge account could not be found. Please sign in again.')
+          user.gmailAccessToken = tokenResult.access_token
+          if (tokenResult.refresh_token) user.gmailRefreshToken = tokenResult.refresh_token
+          user.gmailTokenExpiresAt = Date.now() + Number(tokenResult.expires_in || 3600) * 1000
+          delete db.oauthStates[stateKey]
+          await saveDb(db)
+          res.writeHead(302, { location: CLIENT_ORIGIN.replace(/\/$/, '') + '/settings?gmail=connected' })
+          return res.end()
+        }
+
         const googleUser = await fetchGoogleUserInfo(tokenResult.access_token)
         const normalized = normalizeEmail(googleUser.email)
         let user = db.users[normalized]
