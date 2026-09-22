@@ -122,8 +122,6 @@ export async function executeWorkflow(workflow, user, input = {}) {
     notifications: [],
   }
   let context = input
-  const workflowText = `${workflow.prompt || ''} ${(workflow.nodes || []).map((node) => `${node.data?.title || ''} ${node.data?.instructions || ''}`).join(' ')}`.toLowerCase()
-  const shouldReadGmail = /gmail|inbox|email|unread mail|email messages/.test(workflowText)
 
   try {
     if (!workflow.nodes?.length) throw new Error('This agent has no executable steps')
@@ -133,7 +131,9 @@ export async function executeWorkflow(workflow, user, input = {}) {
       const instructions = node.data?.instructions || node.data?.subtitle || 'Complete this step.'
 
       if (node.data?.kind === 'trigger') {
-        if (shouldReadGmail && !String(input || '').trim()) {
+        const triggerText = `${node.data?.title || ''} ${instructions}`.toLowerCase()
+        const isGmailTrigger = /\bgmail\b|\binbox\b|new email.*arriv|email.*arriv/.test(triggerText)
+        if (isGmailTrigger) {
           if (!user?.gmailAccessToken) throw new Error('Connect Gmail with Google Sign-In before running this email agent.')
           if (user.gmailTokenExpiresAt && user.gmailTokenExpiresAt <= Date.now() + 60_000) {
             const refreshed = await refreshGoogleAccessToken(user.gmailRefreshToken)
