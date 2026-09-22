@@ -6,6 +6,17 @@ function escapeHtml(value) {
   return String(value ?? '').replace(/[&<>"']/g, (character) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[character]))
 }
 
+function hasBrevo() {
+  return Boolean(
+    String(process.env.BREVO_API_KEY || '').trim() &&
+    String(process.env.BREVO_FROM || '').trim(),
+  )
+}
+
+function brevoFrom() {
+  return String(process.env.BREVO_FROM || '').trim()
+}
+
 function hasResend() {
   return Boolean(String(process.env.RESEND_API_KEY || '').trim())
 }
@@ -35,16 +46,64 @@ export function resetTransporter() {
 }
 
 export function mailStatus() {
+  const brevoConfigured = hasBrevo()
   const resendConfigured = hasResend()
   const smtpConfigured = Boolean(getTransporter())
   return {
-    configured: resendConfigured || smtpConfigured,
-    provider: resendConfigured ? 'resend' : smtpConfigured ? 'smtp' : null,
-    from: resendConfigured ? resendFrom() : process.env.RESET_EMAIL_FROM || process.env.SMTP_USER || null,
+    configured: brevoConfigured || resendConfigured || smtpConfigured,
+    provider: brevoConfigured ? 'brevo' : resendConfigured ? 'resend' : smtpConfigured ? 'smtp' : null,
+    from: brevoConfigured
+      ? brevoFrom()
+      : resendConfigured
+        ? resendFrom()
+        : process.env.RESET_EMAIL_FROM || process.env.SMTP_USER || null,
   }
 }
 
-async function sendViaResend({ to, subject, text, html }) {
+async function sendViaBrevo({ to, subject, text, html }) {
+  if (!hasBrevo()) return null
+
+  const controller = new AbortController()
+  const timeout = setTimeout(() => controller.abort(), 12000)
+  try {
+    const response = await fetch('https://api.brevo.com/v3/smtp/email', {
+      method: 'POST',
+      headers: {
+        accept: 'application/json',
+        'api-key': process.env.BREVO_API_KEY,
+        'content-type': 'application/json',
+      },
+      body: JSON.stringify({
+        sender: {
+          email: brevoFrom(),
+          name: process.env.BREVO_FROM_NAME || 'AgentForge',
+        },
+        to: [{ email: to }],
+        subject,
+        textContent: text,
+        htmlContent: html,
+      }),
+      signal: controller.signal,
+    })
+
+    const payload = await response.json().catch(() => ({}))
+    if (!response.ok) {
+      const message = payload?.message || payload?.code || `Brevo API request failed (${response.status})`
+      return { delivered: false, simulated: false, error: message }
+    }
+
+    return { delivered: true, simulated: false, error: null, messageId: payload?.messageId || null }
+  } catch (error) {
+    const message = error.name === 'AbortError'
+      ? 'Brevo API request timed out'
+      : error.message || 'Brevo API delivery failed'
+    return { delivered: false, simulated: false, error: message }
+  } finally {
+    clearTimeout(timeout)
+  }
+}
+
+async function sendViaResend({ to, subject, text, html })
   if (!hasResend()) return null
 
   const controller = new AbortController()
@@ -90,9 +149,14 @@ export async function sendPasswordResetEmail({ to, token }) {
   const text = `Reset your AgentForge password: ${resetUrl}\n\nThis link expires in 30 minutes. If you did not request it, you can ignore this email.`
   const html = `<p>Reset your AgentForge password by clicking the link below.</p><p><a href="${resetUrl}">Reset password</a></p><p>This link expires in 30 minutes. If you did not request it, you can ignore this email.</p>`
 
+  if (hasBrevo()) {
+    const result = await sendViaBrevo({ to, subject, text, html })
+    if (result) return result
+  }
+
   if (hasResend()) {
     const result = await sendViaResend({ to, subject, text, html })
-    return result?.delivered ? result : result
+    if (result) return result
   }
 
   const mailer = getTransporter()
@@ -138,8 +202,9 @@ function renderHtml({ agentName, results, subject }) {
 /**
  * Sends an agent result email.
  *
- * Resend's HTTPS API is preferred when RESEND_API_KEY is configured. This is
- * important for Render Free services, where outbound SMTP ports are blocked.
+ * Brevo's HTTPS API is preferred when BREVO_API_KEY and BREVO_FROM are
+ * configured. This supports normal transactional recipients once the sender
+ * address is verified in Brevo. Resend remains available as a fallback, while
  * SMTP remains available for local development and paid hosts.
  */
 export async function sendWorkflowEmail({ to, workflow, subject }) {
@@ -148,6 +213,11 @@ export async function sendWorkflowEmail({ to, workflow, subject }) {
   const resolvedSubject = subject || `Workflow completed: ${agentName}`
   const text = `${agentName} completed successfully.\n\n${results}`
   const html = renderHtml({ agentName, results, subject: resolvedSubject })
+
+  if (hasBrevo()) {
+    const result = await sendViaBrevo({ to, subject: resolvedSubject, text, html })
+    if (result) return result
+  }
 
   if (hasResend()) {
     const result = await sendViaResend({ to, subject: resolvedSubject, text, html })
