@@ -2,6 +2,7 @@ import { existsSync, readFileSync } from 'node:fs'
 
 const GOOGLE_AUTH_URL = 'https://accounts.google.com/o/oauth2/v2/auth'
 const GOOGLE_TOKEN_URL = 'https://oauth2.googleapis.com/token'
+const GMAIL_READONLY_SCOPE = 'https://www.googleapis.com/auth/gmail.readonly'
 
 function loadEnvFile() {
   try {
@@ -76,9 +77,11 @@ export function googleAuthLoginUrl(state) {
     client_id: clientId,
     redirect_uri: redirectUri,
     response_type: 'code',
-    scope: 'openid email profile',
+    scope: `openid email profile ${GMAIL_READONLY_SCOPE}`,
     state,
-    prompt: 'select_account',
+    access_type: 'offline',
+    include_granted_scopes: 'true',
+    prompt: 'consent select_account',
   })
   return `${GOOGLE_AUTH_URL}?${params}`
 }
@@ -111,6 +114,34 @@ export async function exchangeGoogleAuthCode(code) {
   if (!response.ok) throw new Error(`Google token exchange failed (${response.status})`)
   const token = await response.json()
   if (!token.access_token) throw new Error('Google did not return an access token')
+  return token
+}
+
+export async function refreshGoogleAccessToken(refreshToken) {
+  if (!refreshToken) throw new Error('Google Gmail authorization is missing. Sign in with Google again to connect Gmail.')
+  if (isDemoClient()) return { access_token: 'demo_access_token', token_type: 'Bearer', expires_in: 3600 }
+  const { clientId, clientSecret } = config()
+  const controller = new AbortController()
+  const timeout = setTimeout(() => controller.abort(), 15000)
+  let response
+  try {
+    response = await fetch(GOOGLE_TOKEN_URL, {
+      method: 'POST',
+      headers: { 'content-type': 'application/x-www-form-urlencoded' },
+      signal: controller.signal,
+      body: new URLSearchParams({
+        client_id: clientId,
+        client_secret: clientSecret,
+        refresh_token: refreshToken,
+        grant_type: 'refresh_token',
+      }),
+    })
+  } finally {
+    clearTimeout(timeout)
+  }
+  if (!response.ok) throw new Error(`Google token refresh failed (${response.status})`)
+  const token = await response.json()
+  if (!token.access_token) throw new Error('Google did not return a refreshed access token')
   return token
 }
 
