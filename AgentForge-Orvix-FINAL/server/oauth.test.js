@@ -42,3 +42,29 @@ describe('Google OAuth demo mode', () => {
     expect(isDemoClient()).toBe(false)
   })
 })
+
+
+describe('Google OAuth scopes', () => {
+  it('keeps Gmail permission out of normal Google sign-in', async () => {
+    const { googleAuthLoginUrl } = await loadOauth({
+      GOOGLE_CLIENT_ID: '1234.apps.googleusercontent.com',
+      GOOGLE_CLIENT_SECRET: 'GOCSPX-real-secret',
+      GOOGLE_AUTH_REDIRECT_URI: 'https://example.com/api/auth/google/callback',
+      NODE_ENV: 'production',
+    })
+    const url = new URL(googleAuthLoginUrl('state-123'))
+    expect(url.searchParams.get('scope')).toBe('openid email profile')
+    expect(url.searchParams.get('scope')).not.toContain('gmail.readonly')
+  })
+
+  it('requests Gmail read-only permission only for explicit Gmail connection', async () => {
+    const { googleAuthLoginUrl } = await loadOauth({
+      GOOGLE_CLIENT_ID: '1234.apps.googleusercontent.com',
+      GOOGLE_CLIENT_SECRET: 'GOCSPX-real-secret',
+      GOOGLE_AUTH_REDIRECT_URI: 'https://example.com/api/auth/google/callback',
+      NODE_ENV: 'production',
+    })
+    const url = new URL(googleAuthLoginUrl('state-456', { gmail: true }))
+    expect(url.searchParams.get('scope')).toContain('gmail.readonly')
+  })
+})
