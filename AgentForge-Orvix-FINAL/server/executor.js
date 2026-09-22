@@ -151,6 +151,7 @@ export async function executeWorkflow(workflow, user, input = {}) {
               from: message.headers?.find((header) => header.name?.toLowerCase() === 'from')?.value || '(Unknown sender)',
               date: message.headers?.find((header) => header.name?.toLowerCase() === 'date')?.value || '',
               snippet: message.snippet,
+              body: String(message.body || message.snippet || '').slice(0, 8000),
             })),
           }
           step.output = { source: 'Gmail', fetched: messages.length, unreadOnly: true }
