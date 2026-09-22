@@ -4,8 +4,8 @@
 const emailAutomation = {
   name: 'Email Automation Agent',
   nodes: [
-    { id: 'n1', type: 'workflow', position: { x: 40, y: 140 }, data: { kind: 'trigger', icon: 'Mail', title: 'Email Input', subtitle: 'When email data is provided', instructions: 'Process the email content supplied as the run input.' } },
-    { id: 'n2', type: 'workflow', position: { x: 320, y: 140 }, data: { kind: 'action', icon: 'Inbox', title: 'Prepare Email', subtitle: 'Prepare message content', instructions: 'Prepare the supplied email content for analysis.' } },
+    { id: 'n1', type: 'workflow', position: { x: 40, y: 140 }, data: { kind: 'trigger', icon: 'Mail', title: 'Gmail Inbox Trigger', subtitle: 'When unread email is available', instructions: 'Read unread email messages from the connected Gmail inbox.' } },
+    { id: 'n2', type: 'workflow', position: { x: 320, y: 140 }, data: { kind: 'action', icon: 'Inbox', title: 'Prepare Inbox', subtitle: 'Prepare unread messages', instructions: 'Prepare the unread Gmail messages for analysis.' } },
     { id: 'n3', type: 'workflow', position: { x: 600, y: 140 }, data: { kind: 'ai', icon: 'Sparkles', title: 'AI Summarizer', subtitle: 'Summarize & find important', instructions: 'Summarize the email and identify important messages.' } },
     { id: 'n4', type: 'workflow', position: { x: 880, y: 140 }, data: { kind: 'condition', icon: 'AlertTriangle', title: 'Urgency Check', subtitle: 'Is it urgent?', instructions: 'Continue when the email is urgent.' } },
     { id: 'n5', type: 'workflow', position: { x: 700, y: 320 }, data: { kind: 'action', icon: 'CheckSquare', title: 'Create Task', subtitle: 'Add to task list', instructions: 'Create a task for each important item.' } },
