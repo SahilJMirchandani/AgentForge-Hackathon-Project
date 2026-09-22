@@ -1,4 +1,11 @@
+function isGmailWorkflow(workflow) {
+  const trigger = (workflow.nodes || []).find((node) => node.data?.kind === 'trigger')
+  const text = `${trigger?.data?.title || ''} ${trigger?.data?.instructions || ''} ${workflow.prompt || ''}`.toLowerCase()
+  return /\bgmail\b|\binbox\b|new email.*arriv|monitor.*email|check.*email|read.*email/.test(text)
+}
+
 function scheduleFor(workflow) {
+  if (isGmailWorkflow(workflow)) return { interval: 60_000, gmail: true }
   const trigger = (workflow.nodes || []).find((node) => node.data?.kind === 'trigger')
   const text = `${trigger?.data?.instructions || ''} ${trigger?.data?.subtitle || ''}`.toLowerCase()
   if (/every\s+minute|each\s+minute/.test(text)) return { interval: 60_000 }
@@ -19,7 +26,6 @@ function isDue(workflow, schedule, now) {
 
 export function startScheduler({ db, executeWorkflow, saveDb, notify, intervalMs = 60_000 }) {
   let busy = false
-
   async function tick() {
     if (busy) return
     busy = true
@@ -29,19 +35,28 @@ export function startScheduler({ db, executeWorkflow, saveDb, notify, intervalMs
         if (!workflow.isDeployed || workflow.isActive === false) continue
         const schedule = scheduleFor(workflow)
         if (!schedule || !isDue(workflow, schedule, now)) continue
-        // db.users is keyed by email, workflow.userId is a UUID - match on both.
         const owner = Object.values(db.users || {}).find((user) => user && (user.id === workflow.userId || user.email === workflow.userId))
         if (!owner) continue
+        if (schedule.gmail && !workflow.gmailLastSeenAt) {
+          workflow.gmailLastSeenAt = now
+          workflow.lastScheduledRunAt = now
+          continue
+        }
         workflow.lastScheduledRunAt = now
-        const run = await executeWorkflow(workflow, owner, { trigger: 'schedule', scheduledAt: now })
-        notify(owner, run.status === 'Completed' ? 'Scheduled agent completed' : 'Scheduled agent failed', run.status === 'Completed' ? `${workflow.name} completed its scheduled run.` : run.error)
+        const input = schedule.gmail
+          ? { trigger: 'gmail-poll', gmailQuery: `after:${Math.floor(Number(workflow.gmailLastSeenAt) / 1000)}` }
+          : { trigger: 'schedule', scheduledAt: now }
+        const run = await executeWorkflow(workflow, owner, input)
+        if (schedule.gmail && run.gmailNewestMessageAt) workflow.gmailLastSeenAt = run.gmailNewestMessageAt
+        if (!run.skipNotifications) {
+          notify(owner, run.status === 'Completed' ? (schedule.gmail ? 'New email processed' : 'Scheduled agent completed') : (schedule.gmail ? 'Email agent failed' : 'Scheduled agent failed'), run.status === 'Completed' ? (schedule.gmail ? `${workflow.name} detected and processed a new email.` : `${workflow.name} completed its scheduled run.`) : run.error)
+        }
       }
       await saveDb(db)
     } finally {
       busy = false
     }
   }
-
   const timer = setInterval(() => { void tick().catch((error) => console.error(`Scheduler tick failed: ${error.message}`)) }, intervalMs)
   timer.unref?.()
   return { tick, stop: () => clearInterval(timer) }
