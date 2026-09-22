@@ -309,12 +309,18 @@ async function handle(req, res) {
             name: sanitizeText(googleUser.name, 120),
             email: normalized,
             googleId: googleUser.id,
+            gmailAccessToken: tokenResult.access_token,
+            gmailRefreshToken: tokenResult.refresh_token || null,
+            gmailTokenExpiresAt: Date.now() + Number(tokenResult.expires_in || 3600) * 1000,
             emailNotifications: true,
           }
           db.users[normalized] = user
           db.notifications[normalized] = [{ id: randomUUID(), title: 'Welcome to AgentForge', message: 'Signed in with Google successfully.', read: false, createdAt: Date.now() }]
         } else {
           user.googleId = googleUser.id
+          user.gmailAccessToken = tokenResult.access_token
+          if (tokenResult.refresh_token) user.gmailRefreshToken = tokenResult.refresh_token
+          user.gmailTokenExpiresAt = Date.now() + Number(tokenResult.expires_in || 3600) * 1000
           if (googleUser.name && !user.name) user.name = sanitizeText(googleUser.name, 120)
         }
         delete db.oauthStates[stateKey]
