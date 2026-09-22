@@ -707,6 +707,7 @@ export const useAppStore = create((set, get) => ({
       const nextState = {
         ...state,
         notifications: (state.notifications || []).map((n) => ({ ...n, read: true })),
+        isNotificationsOpen: false,
       }
       return syncCurrentUser(nextState)
     })
@@ -714,7 +715,7 @@ export const useAppStore = create((set, get) => ({
     if (getApiToken()) {
       apiRequest('/notifications/read', { method: 'PATCH', timeoutMs: 8000 })
         .then((response) => {
-          if (response.notifications) set({ notifications: response.notifications })
+          if (response.notifications) set({ notifications: response.notifications, isNotificationsOpen: false })
         })
         .catch(() => {})
     }
