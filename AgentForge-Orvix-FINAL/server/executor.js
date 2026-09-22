@@ -3,6 +3,30 @@ import { runAgentStep } from './gemini.js'
 import { deliverNotification, resolveChannel } from './notifications.js'
 
 const outputKinds = new Set(['output', 'notify'])
+async function deliverNotificationWithDeadline(args, deadlineMs = 2500) {
+  const delivery = deliverNotification(args)
+  let timer
+  const timeout = new Promise((resolve) => {
+    timer = setTimeout(() => resolve({
+      delivered: false,
+      simulated: false,
+      pending: true,
+      error: null,
+      channel: resolveChannel(args.node?.data?.channel, args.prompt),
+      to: args.node?.data?.destination || args.user?.email || '',
+    }), deadlineMs)
+  })
+  try {
+    const result = await Promise.race([delivery, timeout])
+    if (result?.pending) {
+      delivery.catch((error) => console.warn(`Notification delivery finished after workflow completion: ${error.message}`))
+    }
+    return result
+  } finally {
+    clearTimeout(timer)
+  }
+}
+
 
 function valueText(value) {
   if (typeof value === 'string') return value
@@ -86,7 +110,7 @@ export async function executeWorkflow(workflow, user, input = {}) {
           step.output = { delivered: false, skipped: true, channel, reason: 'Email notifications are turned off in Settings' }
           run.notifications.push(step.output)
         } else {
-          const result = await deliverNotification({ node, user, workflow, output: valueText(context), prompt: workflow.prompt })
+          const result = await deliverNotificationWithDeadline({ node, user, workflow, output: valueText(context), prompt: workflow.prompt })
           if (result.error) throw new Error(result.error)
           step.output = {
             delivered: result.delivered,
