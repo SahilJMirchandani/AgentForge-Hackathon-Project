@@ -135,7 +135,7 @@ The built-in Node backend provides password hashing, bearer sessions, account
 creation/login/password reset confirmation, workflow CRUD, Gemini generation and
 execution, tokenized webhook deployment, sandbox scoring, execution history,
 notifications, profile updates, preferences, MongoDB persistence, email
-delivery (Resend HTTPS with SMTP fallback), and IP-based rate limiting. A
+delivery (Brevo HTTPS with Resend and SMTP fallbacks), and IP-based rate limiting. A
 deployed agent accepts `POST` JSON payloads at
 `/api/hooks/:token`; the token is shown in the workflow editor after deployment.
 Google sign-in uses `/api/auth/google` and requires the callback URL configured
