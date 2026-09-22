@@ -863,55 +863,42 @@ export const useAppStore = create((set, get) => ({
     if (!workflow) return null
 
     const applyEvaluation = (evaluation, source) => {
-      const instructionSummary = workflow.nodes
-        .map((node) => node.data?.instructions)
-        .filter(Boolean)
-        .join(' | ')
+      const currentWorkflow = get().getWorkflow(workflowId) || workflow
+      const instructionSummary = currentWorkflow.nodes.map((node) => node.data?.instructions).filter(Boolean).join(' | ')
       const sandboxTests = evaluation.tests.map(([category, input, expectedBehavior, passed], index) => ({
         id: `${workflowId}-${category}-${index + 1}`,
-        category,
-        input,
+        category, input,
         expectedBehavior: `${expectedBehavior} Configured instructions: ${instructionSummary || 'none'}`,
         passed,
       }))
-
-      set((state) => {
-        const nextState = {
-          ...state,
-          workflows: state.workflows.map((w) => (
-            w.id === workflowId
-              ? { ...w, sandboxScore: evaluation.score, sandboxTests, sandboxSource: source }
-              : w
-          )),
-        }
-        return syncCurrentUser(nextState)
-      })
+      set((state) => ({
+        ...state,
+        workflows: state.workflows.map((w) => w.id === workflowId ? { ...w, sandboxScore: evaluation.score, sandboxTests, sandboxSource: source } : w),
+      }))
       persistState(get())
     }
 
+    // Show the deterministic score immediately; refine it with Gemini in the background.
+    const localEvaluation = createSandboxEvaluation(workflow)
+    applyEvaluation(localEvaluation, 'heuristic')
+
     if (getApiToken()) {
-      try {
-        const response = await apiRequest(`/workflows/${workflowId}/sandbox`, { method: 'POST', timeoutMs: 20000 })
-        if (!response.workflow) return response
-        const normalized = normalizeWorkflow(response.workflow)
-        lastServerWorkflowSnapshots.set(normalized.id, JSON.stringify(normalized))
-        set((state) => ({
-          ...state,
-          workflows: state.workflows.map((current) => current.id === workflowId ? normalized : current),
-          notifications: response.notifications || state.notifications,
-        }))
-        persistState(get())
-        return response
-      } catch {
-        // Use the local evaluator immediately if the server evaluator is unavailable.
-      }
+      const fingerprint = workflowDefinitionFingerprint(workflow)
+      void apiRequest(`/workflows/${workflowId}/sandbox`, { method: 'POST', timeoutMs: 12000 })
+        .then((response) => {
+          if (!response.workflow) return
+          const current = get().getWorkflow(workflowId)
+          if (!current || workflowDefinitionFingerprint(current) !== fingerprint) return
+          const normalized = normalizeWorkflow(response.workflow)
+          lastServerWorkflowSnapshots.set(normalized.id, JSON.stringify(normalized))
+          set((state) => ({ ...state, workflows: state.workflows.map((item) => item.id === workflowId ? normalized : item) }))
+          persistState(get())
+        })
+        .catch(() => {})
     }
 
-    const evaluation = createSandboxEvaluation(workflow)
-    applyEvaluation(evaluation, 'heuristic')
     return { workflow: get().getWorkflow(workflowId), sandboxSource: 'heuristic' }
   },
-
   // ---- Workflow creation ----------------------------------------------
   async createWorkflow(prompt) {
     // Render/Gemini should never block the editor opening. Create a usable
@@ -1017,6 +1004,7 @@ export const useAppStore = create((set, get) => ({
   },
 
   addStep(workflowId) {
+    let addedNodeId = null
     set((state) => {
       const nextState = {
         ...state,
@@ -1027,12 +1015,35 @@ export const useAppStore = create((set, get) => ({
             id: nextId('node'),
             type: 'workflow',
             position: { x: (lastNode?.position.x || 0) + 260, y: lastNode?.position.y || 140 },
-            data: { kind: 'action', icon: 'Plus', title: 'New Step', subtitle: 'Configure this step', instructions: 'Configure this step.', status: 'idle' },
+            data: {
+              kind: 'action', icon: 'Plus', title: 'New Step', subtitle: 'Configure this step',
+              instructions: 'Configure this step.', status: 'idle', userAdded: true,
+            },
           }
-          const newEdge = lastNode
-            ? [{ id: nextId('edge'), source: lastNode.id, target: newNode.id }]
-            : []
+          addedNodeId = newNode.id
+          const newEdge = lastNode ? [{ id: nextId('edge'), source: lastNode.id, target: newNode.id }] : []
           return { ...w, nodes: [...w.nodes, newNode], edges: [...w.edges, ...newEdge] }
+        }),
+      }
+      return syncCurrentUser(nextState)
+    })
+    persistState(get())
+    return addedNodeId
+  },
+
+  deleteWorkflowNode(workflowId, nodeId) {
+    set((state) => {
+      const nextState = {
+        ...state,
+        workflows: state.workflows.map((workflow) => {
+          if (workflow.id !== workflowId) return workflow
+          const node = workflow.nodes.find((item) => item.id === nodeId)
+          if (!node?.data?.userAdded) return workflow
+          return {
+            ...workflow,
+            nodes: workflow.nodes.filter((item) => item.id !== nodeId),
+            edges: workflow.edges.filter((edge) => edge.source !== nodeId && edge.target !== nodeId),
+          }
         }),
       }
       return syncCurrentUser(nextState)
