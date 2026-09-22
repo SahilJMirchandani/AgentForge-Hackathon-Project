@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAppStore } from '../store/useAppStore'
+import { apiRequest } from '../api'
 
 export default function Settings() {
   const userName = useAppStore((s) => s.userName)
@@ -9,6 +10,7 @@ export default function Settings() {
   const updateProfile = useAppStore((s) => s.updateProfile)
   const clearSavedSession = useAppStore((s) => s.clearSavedSession)
   const emailNotifications = useAppStore((s) => s.emailNotifications)
+  const gmailConnected = useAppStore((s) => s.gmailConnected)
   const setEmailNotifications = useAppStore((s) => s.setEmailNotifications)
   const navigate = useNavigate()
   const [savedLoginStatus, setSavedLoginStatus] = useState('')
@@ -17,6 +19,33 @@ export default function Settings() {
   const [emailDraft, setEmailDraft] = useState(userEmail)
   const [savingProfile, setSavingProfile] = useState(false)
   const [savingNotifications, setSavingNotifications] = useState(false)
+  const [gmailStatus, setGmailStatus] = useState('')
+  const [connectingGmail, setConnectingGmail] = useState(false)
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search)
+    if (params.get('gmail') === 'connected') {
+      setGmailStatus('Gmail connected successfully. Your email agents can now read unread messages.')
+      window.history.replaceState({}, '', '/settings')
+    }
+    if (params.get('gmail') === 'error') {
+      setGmailStatus('Gmail connection was not completed. Please try again.')
+      window.history.replaceState({}, '', '/settings')
+    }
+  }, [])
+
+  async function handleConnectGmail() {
+    setConnectingGmail(true)
+    setGmailStatus('')
+    try {
+      const response = await apiRequest('/auth/google/gmail', { method: 'POST' })
+      if (response.url) window.location.assign(response.url)
+      else throw new Error('Unable to start Gmail connection.')
+    } catch (error) {
+      setConnectingGmail(false)
+      setGmailStatus(error.message || 'Unable to connect Gmail.')
+    }
+  }
+
   async function handleSaveProfile() {
     setSavingProfile(true)
     const saved = await updateProfile(nameDraft, emailDraft)
@@ -41,6 +70,7 @@ export default function Settings() {
       <p className="text-sm text-ink-soft mt-1">Manage your account and preferences.</p>
 
       <div className="bg-surface border border-border rounded-card shadow-card p-6 mt-6 space-y-5">
+        {gmailStatus && <div className="rounded-control border border-primary/20 bg-primary/5 px-3 py-2 text-xs text-ink font-medium">{gmailStatus}</div>}
         {savedLoginStatus && <div className="rounded-control border border-success/30 bg-success-light px-3 py-2 text-xs text-success font-medium">
           {savedLoginStatus}
         </div>}
@@ -101,6 +131,27 @@ export default function Settings() {
             </div>
           </>
         )}
+
+        <div className="border-t border-border pt-5">
+          <div className="flex items-start justify-between gap-4">
+            <div>
+              <p className="text-sm font-medium text-ink">Gmail connection</p>
+              <p className="text-xs text-ink-soft mt-1">
+                {gmailConnected
+                  ? 'Connected. Email agents can read unread messages from this Gmail account.'
+                  : 'Connect Gmail only when you want an email agent to read your inbox. Google sign-in itself does not require Gmail access.'}
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={handleConnectGmail}
+              disabled={connectingGmail}
+              className="shrink-0 px-4 py-2.5 rounded-control border border-border text-sm font-medium text-ink hover:bg-canvas disabled:opacity-50 transition-colors"
+            >
+              {connectingGmail ? 'Connecting…' : gmailConnected ? 'Reconnect Gmail' : 'Connect Gmail'}
+            </button>
+          </div>
+        </div>
 
         <div>
           <label className="text-xs font-medium text-ink-soft">In-app notifications</label>
