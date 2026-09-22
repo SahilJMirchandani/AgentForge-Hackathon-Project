@@ -1104,7 +1104,33 @@ export const useAppStore = create((set, get) => ({
 
     if (getApiToken()) {
       try {
-        const response = await apiRequest(`/workflows/${workflowId}/run`, { method: 'POST', body: { input: input ?? workflow.prompt }, timeoutMs: 90000 })
+        const runInput = input ?? workflow.prompt
+        let response
+        try {
+          response = await apiRequest(`/workflows/${workflowId}/run`, {
+            method: 'POST',
+            body: { input: runInput },
+            timeoutMs: 90000,
+          })
+        } catch (error) {
+          // The editor can open a locally-created workflow before its background
+          // server creation finishes. Reconcile the server copy once, then retry.
+          if (error.status === 404 && /Workflow not found/i.test(error.message || '')) {
+            const currentWorkflow = get().getWorkflow(workflowId) || workflow
+            await apiRequest(`/workflows/${workflowId}`, {
+              method: 'PATCH',
+              body: currentWorkflow,
+              timeoutMs: 10000,
+            })
+            response = await apiRequest(`/workflows/${workflowId}/run`, {
+              method: 'POST',
+              body: { input: runInput },
+              timeoutMs: 90000,
+            })
+          } else {
+            throw error
+          }
+        }
         if (response.workflow) {
           const normalized = normalizeWorkflow(response.workflow)
           lastServerWorkflowSnapshots.set(normalized.id, JSON.stringify(normalized))
