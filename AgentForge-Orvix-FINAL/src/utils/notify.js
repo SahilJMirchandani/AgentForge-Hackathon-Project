@@ -80,11 +80,12 @@ export function resolveChannel(nodeChannel, prompt = '') {
  * Email falls back to the signed-in account address; Slack and SMS never do,
  * because an account email is neither a webhook URL nor a phone number.
  */
-export function resolveRecipient({ node, user, channel }) {
+export function resolveRecipient({ node, user, channel, prompt = '' }) {
   const configured = String(node?.data?.destination ?? node?.destination ?? '').trim()
 
   if (channel === 'email') {
-    const candidate = configured || String(user?.email || '').trim()
+    const promptRecipient = extractDestinationFromPrompt(prompt, 'email')
+    const candidate = configured || promptRecipient || String(user?.email || '').trim()
     if (!candidate) return { ok: false, error: 'No email address is configured for this notification step' }
     if (!isValidEmail(candidate)) return { ok: false, error: `"${candidate}" is not a valid email address` }
     return { ok: true, to: candidate, usedFallback: !configured }
