@@ -21,7 +21,7 @@ export {
  */
 export async function deliverNotification({ node, user, workflow, output, prompt }) {
   const channel = resolveChannel(node?.data?.channel, prompt ?? workflow?.prompt)
-  const recipient = resolveRecipient({ node, user, channel })
+  const recipient = resolveRecipient({ node, user, channel, prompt: prompt ?? workflow?.prompt })
   if (!recipient.ok) return { delivered: false, simulated: false, channel, to: null, error: recipient.error }
 
   const agentName = workflow?.name || 'Agent'
