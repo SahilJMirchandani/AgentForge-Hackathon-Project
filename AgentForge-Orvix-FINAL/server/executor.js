@@ -1,6 +1,8 @@
 import { randomUUID } from 'node:crypto'
 import { runAgentStep } from './gemini.js'
 import { deliverNotification, resolveChannel } from './notifications.js'
+import { fetchGmailMessages } from './integrations.js'
+import { refreshGoogleAccessToken } from './oauth.js'
 
 const outputKinds = new Set(['output', 'notify'])
 async function deliverNotificationWithDeadline(args, deadlineMs = 2500) {
@@ -120,6 +122,8 @@ export async function executeWorkflow(workflow, user, input = {}) {
     notifications: [],
   }
   let context = input
+  const workflowText = `${workflow.prompt || ''} ${(workflow.nodes || []).map((node) => `${node.data?.title || ''} ${node.data?.instructions || ''}`).join(' ')}`.toLowerCase()
+  const shouldReadGmail = /gmail|inbox|email|unread mail|email messages/.test(workflowText)
 
   try {
     if (!workflow.nodes?.length) throw new Error('This agent has no executable steps')
@@ -129,9 +133,30 @@ export async function executeWorkflow(workflow, user, input = {}) {
       const instructions = node.data?.instructions || node.data?.subtitle || 'Complete this step.'
 
       if (node.data?.kind === 'trigger') {
-        const triggerInstructions = instructions.toLowerCase()
-        if (/gmail/.test(triggerInstructions)) throw new Error('Gmail integration is unavailable. Provide the email content as the run input instead.')
-        context = input
+        if (shouldReadGmail && !String(input || '').trim()) {
+          if (!user?.gmailAccessToken) throw new Error('Connect Gmail with Google Sign-In before running this email agent.')
+          if (user.gmailTokenExpiresAt && user.gmailTokenExpiresAt <= Date.now() + 60_000) {
+            const refreshed = await refreshGoogleAccessToken(user.gmailRefreshToken)
+            user.gmailAccessToken = refreshed.access_token
+            user.gmailTokenExpiresAt = Date.now() + Number(refreshed.expires_in || 3600) * 1000
+            if (refreshed.refresh_token) user.gmailRefreshToken = refreshed.refresh_token
+          }
+          const messages = await fetchGmailMessages(user.gmailAccessToken, 10)
+          context = {
+            source: 'gmail',
+            count: messages.length,
+            messages: messages.map((message) => ({
+              id: message.id,
+              subject: message.headers?.find((header) => header.name?.toLowerCase() === 'subject')?.value || '(No subject)',
+              from: message.headers?.find((header) => header.name?.toLowerCase() === 'from')?.value || '(Unknown sender)',
+              date: message.headers?.find((header) => header.name?.toLowerCase() === 'date')?.value || '',
+              snippet: message.snippet,
+            })),
+          }
+          step.output = { source: 'Gmail', fetched: messages.length, unreadOnly: true }
+        } else {
+          context = input
+        }
       } else if (node.data?.kind === 'ai') {
         context = await runAgentStep({ instructions, input: context, workflow })
       } else if (node.data?.kind === 'condition') {
