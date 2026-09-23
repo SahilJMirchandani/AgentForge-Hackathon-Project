@@ -56,7 +56,7 @@ describe('Google OAuth demo mode', () => {
     expect(url.searchParams.get('scope')).toBe('https://www.googleapis.com/auth/gmail.readonly')
     expect(url.searchParams.get('prompt')).toBe('consent')
     expect(url.searchParams.get('access_type')).toBe('offline')
-    expect(url.searchParams.get('approval_prompt')).toBe('force')
+    expect(url.searchParams.get('approval_prompt')).toBeNull()
     expect(url.searchParams.get('include_granted_scopes')).toBe('false')
   })
 })
