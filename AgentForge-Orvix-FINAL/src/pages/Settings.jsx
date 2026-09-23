@@ -30,11 +30,11 @@ export default function Settings() {
     const params = new URLSearchParams(window.location.search)
     if (params.get('gmail') === 'connected') {
       setGmailConnectedLocal(true)
-      setGmailStatus('Gmail connected successfully. Your email agents can now read unread messages.')
+      setGmailStatus('Gmail connected successfully. Your email agents can now read your inbox.')
       window.history.replaceState({}, '', '/settings')
     }
     if (params.get('gmail') === 'error') {
-      setGmailStatus(params.get('message') || 'Gmail connection was not completed. Please try again.')
+      setGmailStatus(params.get('message') || 'Gmail connection was not completed. Please reconnect and allow Gmail read access.')
       window.history.replaceState({}, '', '/settings')
     }
   }, [])
