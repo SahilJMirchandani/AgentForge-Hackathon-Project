@@ -46,14 +46,17 @@ describe('agent executor', () => {
     expect(agent.executionHistory[0].id).toBe(run.id)
   })
 
-  it('reports a clear error when a Gmail trigger has no connected account', async () => {
+  it('processes a Gmail/email trigger through the built-in demo inbox', async () => {
     const agent = workflow()
     agent.nodes[0].data.instructions = 'When a new email arrives in Gmail.'
     const run = await executeWorkflow(agent, { email: 'owner@example.com' }, 'email body')
 
-    expect(run.status).toBe('Failed')
-    expect(run.error).toMatch(/Gmail (integration is unavailable|is not connected)/)
-    expect(agent.results[0].label).toBe('Run error')
+    expect(run.status).toBe('Completed')
+    expect(run.steps[0].output).toMatchObject({ source: 'Demo inbox', demo: true, fetched: 3 })
+    expect(runAgentStep).toHaveBeenCalledWith(expect.objectContaining({
+      input: expect.objectContaining({ source: 'demo-inbox', demo: true, count: 3 }),
+    }))
+    expect(agent.results[0].label).toBe('Agent output')
   })
 
   it('fails the run when an output side effect cannot be delivered', async () => {
