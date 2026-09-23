@@ -331,11 +331,11 @@ async function handle(req, res) {
           // Validate the newly issued token before replacing an existing Gmail connection.
           // This prevents an old profile-only token from surviving a failed Gmail grant.
           await validateGmailAccessToken(tokenResult.access_token)
-          if (!tokenResult.refresh_token && !user.gmailRefreshToken) {
-            throw new Error('Google did not return a Gmail refresh token. Please reconnect Gmail and approve offline access.')
+          if (!tokenResult.refresh_token) {
+            throw new Error('Google did not issue a fresh Gmail authorization token. Remove AgentForge from your Google Account connected apps, then connect Gmail again and approve Gmail read access.')
           }
           user.gmailAccessToken = tokenResult.access_token
-          if (tokenResult.refresh_token) user.gmailRefreshToken = tokenResult.refresh_token
+          user.gmailRefreshToken = tokenResult.refresh_token
           user.gmailTokenExpiresAt = Date.now() + Number(tokenResult.expires_in || 3600) * 1000
           delete db.oauthStates[stateKey]
           await saveDb(db)
