@@ -49,7 +49,8 @@ function deriveNotificationSubject({ explicitSubject, workflow, input, output })
   const promptLower = prompt.toLowerCase()
   const inputObject = input && typeof input === 'object' && !Array.isArray(input) ? input : null
 
-  if (/inbox|gmail|email/.test(promptLower)) {
+  const isInboxWorkflow = /\b(?:inbox|gmail)\b|\b(?:new|unread|incoming)\s+emails?\b|\b(?:read|summar(?:ize|ise))\s+(?:my\s+)?emails?\b/i.test(prompt)
+  if (isInboxWorkflow) {
     const processed = output?.match?.(/Messages processed:\s*(\d+)/i)?.[1]
     if (processed) return `Inbox Summary — ${processed} message${processed === "1" ? "" : "s"}`
     const messageSubject = compactSubject(inputObject?.subject || inputObject?.emailSubject, 72)
