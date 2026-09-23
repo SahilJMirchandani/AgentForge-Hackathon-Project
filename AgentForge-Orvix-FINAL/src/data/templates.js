@@ -22,14 +22,14 @@ const emailAutomation = {
     'Email input received',
     'Email content prepared',
     '3 demo messages loaded',
-    '2 action items detected',
-    '2 follow-up tasks identified',
+    '1 high-priority issue detected',
+    '2 follow-up actions identified',
     'Notification sent',
   ],
   results: [
     { label: 'Demo Emails Processed', value: 3, icon: 'Mail' },
-    { label: 'Action Items', value: 2, icon: 'AlertTriangle' },
-    { label: 'Follow-up Tasks', value: 2, icon: 'CheckSquare' },
+    { label: 'High-Priority Issues', value: 1, icon: 'AlertTriangle' },
+    { label: 'Follow-up Actions', value: 2, icon: 'CheckSquare' },
   ],
 }
 
