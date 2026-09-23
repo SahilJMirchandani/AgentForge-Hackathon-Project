@@ -173,6 +173,7 @@ function getDefaultState() {
     notifications: DEFAULT_NOTIFICATIONS,
     emailNotifications: true,
     gmailConnected: false,
+    gmailEmail: '',
     isNotificationsOpen: false,
     users: {},
     lastError: null,
@@ -499,7 +500,7 @@ export const useAppStore = create((set, get) => ({
       setApiToken(response.token, remember)
       const serverWorkflows = (response.workflows || []).map(normalizeWorkflow)
       serverWorkflows.forEach((workflow) => lastServerWorkflowSnapshots.set(workflow.id, JSON.stringify(workflow)))
-      set((state) => ({ ...state, isAuthenticated: true, userEmail: response.user.email, userName: response.user.name, workflows: serverWorkflows, notifications: response.notifications || DEFAULT_NOTIFICATIONS, emailNotifications: response.user.emailNotifications !== false, gmailConnected: response.user.gmailConnected === true, lastError: null }))
+      set((state) => ({ ...state, isAuthenticated: true, userEmail: response.user.email, userName: response.user.name, workflows: serverWorkflows, notifications: response.notifications || DEFAULT_NOTIFICATIONS, emailNotifications: response.user.emailNotifications !== false, gmailConnected: response.user.gmailConnected === true, gmailEmail: response.user.gmailEmail || '', lastError: null }))
       persistState(get())
       if (remember) saveStoredSession({ email: response.user.email })
       else saveStoredSession(null)
