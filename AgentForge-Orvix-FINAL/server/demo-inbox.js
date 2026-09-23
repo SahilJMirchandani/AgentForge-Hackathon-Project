@@ -6,8 +6,8 @@ export const DEMO_INBOX_MESSAGES = [
   {
     id: 'demo-email-001',
     internalDate: hoursAgo(1.2),
-    snippet: 'The revised dashboard scope has been approved. Please prepare the final task list before Friday.',
-    body: 'Hi team,\n\nThe revised dashboard scope has been approved. Please prepare the final task list before Friday so implementation can begin next week.\n\nThanks,\nProject Management',
+    snippet: 'The revised dashboard scope has been approved. Implementation can begin next week.',
+    body: 'Hi team,\n\nThe revised dashboard scope has been approved. Implementation can begin next week. Please refer to the approved scope for planning.\n\nThanks,\nProject Management',
     headers: [
       { name: 'From', value: 'Project Management <project-management@example.com>' },
       { name: 'Subject', value: 'Dashboard scope approved — next steps' },
