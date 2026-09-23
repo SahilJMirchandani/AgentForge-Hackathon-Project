@@ -11,6 +11,7 @@ export default function Settings() {
   const clearSavedSession = useAppStore((s) => s.clearSavedSession)
   const emailNotifications = useAppStore((s) => s.emailNotifications)
   const gmailConnected = useAppStore((s) => s.gmailConnected)
+  const gmailEmail = useAppStore((s) => s.gmailEmail)
   const setEmailNotifications = useAppStore((s) => s.setEmailNotifications)
   const navigate = useNavigate()
   const [savedLoginStatus, setSavedLoginStatus] = useState('')
@@ -22,15 +23,19 @@ export default function Settings() {
   const [gmailStatus, setGmailStatus] = useState('')
   const [connectingGmail, setConnectingGmail] = useState(false)
   const [gmailConnectedLocal, setGmailConnectedLocal] = useState(gmailConnected)
+  const [gmailEmailLocal, setGmailEmailLocal] = useState(gmailEmail)
   useEffect(() => {
     setGmailConnectedLocal(gmailConnected)
-  }, [gmailConnected])
+    setGmailEmailLocal(gmailEmail)
+  }, [gmailConnected, gmailEmail])
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search)
     if (params.get('gmail') === 'connected') {
       setGmailConnectedLocal(true)
-      setGmailStatus('Gmail connected successfully. Your email agents can now read your inbox.')
+      const connectedAddress = params.get('gmailEmail') || ''
+      setGmailEmailLocal(connectedAddress)
+      setGmailStatus(connectedAddress ? `Gmail connected successfully: ${connectedAddress}` : 'Gmail connected successfully. Your email agents can now read your inbox.')
       window.history.replaceState({}, '', '/settings')
     }
     if (params.get('gmail') === 'error') {
@@ -144,7 +149,7 @@ export default function Settings() {
               <p className="text-sm font-medium text-ink">Gmail connection</p>
               <p className="text-xs text-ink-soft mt-1">
                 {gmailConnectedLocal
-                  ? 'Connected. Email agents can read unread messages from this Gmail account.'
+                  ? `Connected${gmailEmailLocal ? `: ${gmailEmailLocal}` : ''}. Email agents can read unread messages from this Gmail account.`
                   : 'Connect Gmail only when you want an email agent to read your inbox. Google sign-in itself does not require Gmail access.'}
               </p>
             </div>
