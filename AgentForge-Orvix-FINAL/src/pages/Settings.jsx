@@ -1,7 +1,6 @@
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAppStore } from '../store/useAppStore'
-import { apiRequest } from '../api'
 
 export default function Settings() {
   const userName = useAppStore((s) => s.userName)
@@ -10,52 +9,15 @@ export default function Settings() {
   const updateProfile = useAppStore((s) => s.updateProfile)
   const clearSavedSession = useAppStore((s) => s.clearSavedSession)
   const emailNotifications = useAppStore((s) => s.emailNotifications)
-  const gmailConnected = useAppStore((s) => s.gmailConnected)
-  const gmailEmail = useAppStore((s) => s.gmailEmail)
   const setEmailNotifications = useAppStore((s) => s.setEmailNotifications)
   const navigate = useNavigate()
+
   const [savedLoginStatus, setSavedLoginStatus] = useState('')
   const [isEditingProfile, setIsEditingProfile] = useState(false)
   const [nameDraft, setNameDraft] = useState(userName)
   const [emailDraft, setEmailDraft] = useState(userEmail)
   const [savingProfile, setSavingProfile] = useState(false)
   const [savingNotifications, setSavingNotifications] = useState(false)
-  const [gmailStatus, setGmailStatus] = useState('')
-  const [connectingGmail, setConnectingGmail] = useState(false)
-  const [gmailConnectedLocal, setGmailConnectedLocal] = useState(gmailConnected)
-  const [gmailEmailLocal, setGmailEmailLocal] = useState(gmailEmail)
-  useEffect(() => {
-    setGmailConnectedLocal(gmailConnected)
-    setGmailEmailLocal(gmailEmail)
-  }, [gmailConnected, gmailEmail])
-
-  useEffect(() => {
-    const params = new URLSearchParams(window.location.search)
-    if (params.get('gmail') === 'connected') {
-      setGmailConnectedLocal(true)
-      const connectedAddress = params.get('gmailEmail') || ''
-      setGmailEmailLocal(connectedAddress)
-      setGmailStatus(connectedAddress ? `Gmail connected successfully: ${connectedAddress}` : 'Gmail connected successfully. Your email agents can now read your inbox.')
-      window.history.replaceState({}, '', '/settings')
-    }
-    if (params.get('gmail') === 'error') {
-      setGmailStatus(params.get('message') || 'Gmail connection was not completed. Please reconnect and allow Gmail read access.')
-      window.history.replaceState({}, '', '/settings')
-    }
-  }, [])
-
-  async function handleConnectGmail() {
-    setConnectingGmail(true)
-    setGmailStatus('')
-    try {
-      const response = await apiRequest('/auth/google/gmail', { method: 'POST' })
-      if (response.url) window.location.assign(response.url)
-      else throw new Error('Unable to start Gmail connection.')
-    } catch (error) {
-      setConnectingGmail(false)
-      setGmailStatus(error.message || 'Unable to connect Gmail.')
-    }
-  }
 
   async function handleSaveProfile() {
     setSavingProfile(true)
@@ -81,10 +43,12 @@ export default function Settings() {
       <p className="text-sm text-ink-soft mt-1">Manage your account and preferences.</p>
 
       <div className="bg-surface border border-border rounded-card shadow-card p-6 mt-6 space-y-5">
-        {gmailStatus && <div className="rounded-control border border-primary/20 bg-primary/5 px-3 py-2 text-xs text-ink font-medium">{gmailStatus}</div>}
-        {savedLoginStatus && <div className="rounded-control border border-success/30 bg-success-light px-3 py-2 text-xs text-success font-medium">
-          {savedLoginStatus}
-        </div>}
+        {savedLoginStatus && (
+          <div className="rounded-control border border-success/30 bg-success-light px-3 py-2 text-xs text-success font-medium">
+            {savedLoginStatus}
+          </div>
+        )}
+
         {!isEditingProfile ? (
           <>
             <div>
@@ -144,23 +108,18 @@ export default function Settings() {
         )}
 
         <div className="border-t border-border pt-5">
-          <div className="flex items-start justify-between gap-4">
-            <div>
-              <p className="text-sm font-medium text-ink">Gmail connection</p>
-              <p className="text-xs text-ink-soft mt-1">
-                {gmailConnectedLocal
-                  ? `Connected${gmailEmailLocal ? `: ${gmailEmailLocal}` : ''}. Email agents can monitor newly arrived messages from this Gmail account.`
-                  : 'Connect Gmail only when you want an email agent to read your inbox. Google sign-in itself does not require Gmail access.'}
-              </p>
+          <div className="flex items-start gap-3">
+            <div className="mt-0.5 h-8 w-8 rounded-control bg-primary-light flex items-center justify-center text-primary text-sm font-semibold">
+              ✦
             </div>
-            <button
-              type="button"
-              onClick={handleConnectGmail}
-              disabled={connectingGmail}
-              className="shrink-0 px-4 py-2.5 rounded-control border border-border text-sm font-medium text-ink hover:bg-canvas disabled:opacity-50 transition-colors"
-            >
-              {connectingGmail ? 'Connecting…' : gmailConnectedLocal ? 'Reconnect Gmail' : 'Connect Gmail'}
-            </button>
+            <div>
+              <p className="text-sm font-medium text-ink">Demo email inbox</p>
+              <p className="text-xs text-ink-soft mt-1 leading-5">
+                Email and inbox agents use a built-in demo inbox for presentations and testing.
+                No Google or Gmail connection is required.
+              </p>
+              <p className="text-xs text-success font-medium mt-2">Ready to run</p>
+            </div>
           </div>
         </div>
 
