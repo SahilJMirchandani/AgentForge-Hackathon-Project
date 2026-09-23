@@ -25,9 +25,9 @@ loadEnvFile()
 
 function config() {
   const defaultAppUrl = process.env.NODE_ENV === 'production'
-    ? `http://127.0.0.1:${process.env.PORT || 4000}`
-    : 'http://localhost:5173'
-  const appUrl = (process.env.APP_URL || defaultAppUrl).replace(/\/$/, '')
+    ? (process.env.API_PUBLIC_URL || process.env.APP_URL || '')
+    : (process.env.APP_URL || 'http://localhost:5173')
+  const appUrl = String(defaultAppUrl || '').replace(/\/$/, '')
   return {
     clientId: process.env.GOOGLE_CLIENT_ID,
     clientSecret: process.env.GOOGLE_CLIENT_SECRET,
@@ -68,14 +68,14 @@ export function googleAuthLoginRedirectUri() {
   return redirectUri
 }
 
-export function googleAuthLoginUrl(state, { gmail = false, email = '' } = {}) {
+export function googleAuthLoginUrl(state, { gmail = false, email = '', redirectUri = '' } = {}) {
   const { clientId } = config()
   if (!clientId) throw new Error('Google OAuth is not configured')
-  const redirectUri = googleAuthLoginRedirectUri()
+  const callbackUri = redirectUri || googleAuthLoginRedirectUri()
   if (isDemoClient()) return `${redirectUri}?state=${state}&code=demo_auth_code`
   const params = new URLSearchParams({
     client_id: clientId,
-    redirect_uri: redirectUri,
+    redirect_uri: callbackUri,
     response_type: 'code',
     scope: gmail ? `openid email profile ${GMAIL_READONLY_SCOPE}` : 'openid email profile',
     state,
@@ -87,12 +87,12 @@ export function googleAuthLoginUrl(state, { gmail = false, email = '' } = {}) {
   return `${GOOGLE_AUTH_URL}?${params}`
 }
 
-export async function exchangeGoogleAuthCode(code) {
+export async function exchangeGoogleAuthCode(code, redirectUriOverride = '') {
   if (isDemoClient() || code === 'demo_auth_code') {
     return { access_token: 'demo_access_token', token_type: 'Bearer', expires_in: 3600 }
   }
   const { clientId, clientSecret } = config()
-  const redirectUri = googleAuthLoginRedirectUri()
+  const redirectUri = redirectUriOverride || googleAuthLoginRedirectUri()
   const controller = new AbortController()
   const timeout = setTimeout(() => controller.abort(), 15000)
   let response
