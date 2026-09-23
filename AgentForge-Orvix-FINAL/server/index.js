@@ -287,6 +287,24 @@ async function handle(req, res) {
       })
       return res.end()
     }
+    if (req.method === 'POST' && url.pathname === '/api/auth/google/gmail') {
+      const user = requireUser(req, res)
+      if (!user) return
+      if (!googleConfigured()) return json(res, 503, { error: 'Google OAuth is not configured on the server.' }, allowedOrigin)
+      const state = randomBytes(24).toString('hex')
+      const forwardedProto = String(req.headers['x-forwarded-proto'] || '').split(',')[0].trim() || 'https'
+      const publicOrigin = appConfig.publicApiOrigin || `${forwardedProto}://${req.headers.host}`
+      const redirectUri = `${publicOrigin.replace(/\/$/, '')}/api/auth/google/callback`
+      db.oauthStates[state] = {
+        type: 'gmail',
+        email: user.email,
+        redirectUri,
+        expiresAt: Date.now() + 10 * 60 * 1000,
+      }
+      const googleUrl = googleAuthLoginUrl(state, { gmail: true, email: user.email, redirectUri })
+      saveDb(db).catch((error) => console.warn(`Gmail OAuth state persistence warning: ${error.message}`))
+      return json(res, 200, { url: googleUrl }, allowedOrigin)
+    }
     if (req.method === 'GET' && url.pathname === '/api/auth/google/callback') {
       const stateKey = url.searchParams.get('state')
       const state = db.oauthStates[stateKey]
@@ -328,9 +346,6 @@ async function handle(req, res) {
             name: sanitizeText(googleUser.name, 120),
             email: normalized,
             googleId: googleUser.id,
-            gmailAccessToken: tokenResult.access_token,
-            gmailRefreshToken: tokenResult.refresh_token || null,
-            gmailTokenExpiresAt: Date.now() + Number(tokenResult.expires_in || 3600) * 1000,
             emailNotifications: true,
           }
           db.users[normalized] = user
