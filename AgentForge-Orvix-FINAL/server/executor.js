@@ -132,8 +132,8 @@ export async function executeWorkflow(workflow, user, input = {}) {
       if (node.data?.kind === 'trigger') {
         const triggerText = `${node.data?.title || ''} ${instructions}`.toLowerCase()
         const promptText = String(workflow.prompt || '').toLowerCase()
-        const isGmailTrigger = /\bgmail\b|\binbox\b|new email.*arriv|email.*arriv/.test(triggerText) || /\bgmail\b|\binbox\b|monitor.*email|check.*email|read.*email|unread.*email/.test(promptText)
-        if (isGmailTrigger) {
+        const isEmailTrigger = /\b(?:gmail|email|inbox)\b|new email.*arriv|email.*arriv/.test(triggerText) || /\b(?:gmail|email|inbox)\b|monitor.*email|check.*email|read.*email|unread.*email/.test(promptText)
+        if (isEmailTrigger) {
           // Presentation/demo mode: use a deterministic built-in inbox instead of
           // requiring a live Google OAuth connection.
           const query = input?.gmailQuery || 'is:unread'
@@ -178,7 +178,7 @@ export async function executeWorkflow(workflow, user, input = {}) {
       } else if (node.data?.kind === 'ai') {
         if (run.skipNotifications) {
           context = context
-          step.output = { skipped: true, reason: 'No new Gmail messages arrived during this poll.' }
+          step.output = { skipped: true, reason: 'No new demo inbox messages arrived during this poll.' }
           step.status = 'Completed'
           step.completedAt = Date.now()
           continue
