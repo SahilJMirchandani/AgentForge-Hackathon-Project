@@ -354,7 +354,7 @@ async function handle(req, res) {
           user.gmailTokenExpiresAt = Date.now() + Number(tokenResult.expires_in || 3600) * 1000
           delete db.oauthStates[stateKey]
           await saveDb(db)
-          res.writeHead(302, { location: CLIENT_ORIGIN.replace(/\/$/, '') + '/settings?gmail=connected' })
+          res.writeHead(302, { location: CLIENT_ORIGIN.replace(/\/$/, '') + '/settings?gmail=connected&gmailEmail=' + encodeURIComponent(user.gmailEmail || '') })
           return res.end()
         }
 
