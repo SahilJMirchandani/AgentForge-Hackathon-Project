@@ -135,13 +135,19 @@ export async function executeWorkflow(workflow, user, input = {}) {
         const promptText = String(workflow.prompt || '').toLowerCase()
         const isGmailTrigger = /\bgmail\b|\binbox\b|new email.*arriv|email.*arriv/.test(triggerText) || /\bgmail\b|\binbox\b|monitor.*email|check.*email|read.*email|unread.*email/.test(promptText)
         if (isGmailTrigger) {
-          if (!user?.gmailAccessToken) throw new Error('Gmail is not connected. Go to Settings and click Connect Gmail before running this email agent.')
+          if (!user?.gmailAccessToken && !user?.gmailRefreshToken) throw new Error('Gmail is not connected. Go to Settings and click Connect Gmail before running this email agent.')
           const gmailQuery = input?.gmailQuery || 'is:unread'
           let messages
           try {
-            // The access token can still be valid even when stored expiry metadata is stale.
-            // Let Gmail be the source of truth and only refresh after a real 401/403.
-            messages = await fetchGmailMessages(user.gmailAccessToken, 10, gmailQuery)
+            // Use a stored access token when present. If only a refresh token remains,
+            // obtain a fresh access token before touching Gmail.
+            if (!user.gmailAccessToken && user.gmailRefreshToken) {
+              const refreshed = await refreshGoogleAccessToken(user.gmailRefreshToken)
+              user.gmailAccessToken = refreshed.access_token
+              user.gmailTokenExpiresAt = Date.now() + Number(refreshed.expires_in || 3600) * 1000
+              if (refreshed.refresh_token) user.gmailRefreshToken = refreshed.refresh_token
+            }
+            messages = await fetchGmailMessages(user.gmailAccessToken, 20, gmailQuery)
           } catch (gmailError) {
             if ((gmailError.status === 401 || gmailError.status === 403) && user.gmailRefreshToken) {
               try {
@@ -152,14 +158,19 @@ export async function executeWorkflow(workflow, user, input = {}) {
                 messages = await fetchGmailMessages(user.gmailAccessToken, 10, gmailQuery)
               } catch (refreshError) {
                 refreshError.status = refreshError.status || gmailError.status
-                if (refreshError.status === 400 || refreshError.providerError === 'invalid_grant') {
-                  // The refresh token is no longer usable (commonly after revocation or
-                  // test-user authorization expiry). Remove it so the UI reports the
-                  // account as disconnected instead of failing every future run.
+                if (
+                  refreshError.status === 400 ||
+                  refreshError.providerError === 'invalid_grant' ||
+                  refreshError.providerReason === 'insufficientAuthenticationScopes' ||
+                  /insufficient authentication scopes/i.test(refreshError.message || '')
+                ) {
+                  // Do not keep retrying a credential that Google has explicitly rejected.
                   delete user.gmailAccessToken
                   delete user.gmailRefreshToken
                   delete user.gmailTokenExpiresAt
-                  refreshError.message = 'Gmail authorization has expired or been revoked. Reconnect Gmail in Settings, then run the agent again.'
+                  refreshError.message = refreshError.providerReason === 'insufficientAuthenticationScopes'
+                    ? 'Gmail permission is missing from the connected Google grant. Reconnect Gmail in Settings and approve Gmail read access.'
+                    : 'Gmail authorization has expired or been revoked. Reconnect Gmail in Settings, then run the agent again.'
                   run.gmailReconnectRequired = true
                 }
                 throw refreshError
