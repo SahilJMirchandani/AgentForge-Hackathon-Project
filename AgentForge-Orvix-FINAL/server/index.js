@@ -11,7 +11,7 @@ import { deliverNotification, extractDestinationFromPrompt, resolveChannel, vali
 import { smsStatus } from './sms.js'
 import { executeWorkflow } from './executor.js'
 import { startScheduler } from './scheduler.js'
-import { googleConfigured, googleAuthLoginUrl, exchangeGoogleAuthCode, refreshGoogleAccessToken, fetchGoogleUserInfo, validateGmailAccessToken } from './oauth.js'
+import { googleConfigured, googleAuthLoginUrl, googleAuthLoginRedirectUri, exchangeGoogleAuthCode, refreshGoogleAccessToken, fetchGoogleUserInfo, validateGmailAccessToken } from './oauth.js'
 import { rateLimit } from './rate-limit.js'
 import { getAppConfig, resolveAllowedOrigins } from './config.js'
 
@@ -273,9 +273,7 @@ async function handle(req, res) {
     if ((req.method === 'GET' || req.method === 'POST') && url.pathname === '/api/auth/google') {
       if (!googleConfigured()) return json(res, 503, { error: 'Google OAuth is not configured on the server. Please set GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET in .env.' }, allowedOrigin)
       const state = randomBytes(24).toString('hex')
-      const forwardedProto = String(req.headers['x-forwarded-proto'] || '').split(',')[0].trim() || 'https'
-      const publicOrigin = appConfig.publicApiOrigin || `${forwardedProto}://${req.headers.host}`
-      const redirectUri = `${publicOrigin.replace(/\/$/, '')}/api/auth/google/callback`
+      const redirectUri = googleAuthLoginRedirectUri()
       db.oauthStates[state] = { type: 'login', redirectUri, clientOrigin: oauthClientOrigin(req), expiresAt: Date.now() + 10 * 60 * 1000 }
       const googleUrl = googleAuthLoginUrl(state, { redirectUri })
       await saveDb(db).catch((error) => console.warn(`Google login state persistence warning: ${error.message}`))
@@ -293,9 +291,7 @@ async function handle(req, res) {
       if (!user) return
       if (!googleConfigured()) return json(res, 503, { error: 'Google OAuth is not configured on the server.' }, allowedOrigin)
       const state = randomBytes(24).toString('hex')
-      const forwardedProto = String(req.headers['x-forwarded-proto'] || '').split(',')[0].trim() || 'https'
-      const publicOrigin = appConfig.publicApiOrigin || `${forwardedProto}://${req.headers.host}`
-      const redirectUri = `${publicOrigin.replace(/\/$/, '')}/api/auth/google/callback`
+      const redirectUri = googleAuthLoginRedirectUri()
       // Keep the existing connection intact until the new OAuth grant succeeds.
       // A cancelled/failed reconnect must never break a previously working connection.
       db.oauthStates[state] = {
