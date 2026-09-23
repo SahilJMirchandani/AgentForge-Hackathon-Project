@@ -49,7 +49,8 @@ export function startScheduler({ db, executeWorkflow, saveDb, notify, intervalMs
         const run = await executeWorkflow(workflow, owner, input)
         if (schedule.gmail && run.status === 'Completed' && run.gmailNewestMessageAt) workflow.gmailLastSeenAt = run.gmailNewestMessageAt
         if (!run.skipNotifications) {
-          notify(owner, run.status === 'Completed' ? (schedule.gmail ? 'New email processed' : 'Scheduled agent completed') : (schedule.gmail ? 'Email agent failed' : 'Scheduled agent failed'), run.status === 'Completed' ? (schedule.gmail ? `${workflow.name} detected and processed a new email.` : `${workflow.name} completed its scheduled run.`) : run.error)
+          const summaryText = schedule.gmail && run.status === 'Completed' ? String(run.output || '').slice(0, 1200) : ''
+          notify(owner, run.status === 'Completed' ? (schedule.gmail ? 'New email processed' : 'Scheduled agent completed') : (schedule.gmail ? 'Email agent failed' : 'Scheduled agent failed'), run.status === 'Completed' ? (schedule.gmail ? `${workflow.name} detected a new email. Summary:\n${summaryText || 'Summary generated successfully.'}` : `${workflow.name} completed its scheduled run.`) : run.error)
         }
       }
       await saveDb(db)
