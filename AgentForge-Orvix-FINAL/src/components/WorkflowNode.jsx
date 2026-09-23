@@ -17,7 +17,7 @@ const KIND_STYLES = {
   output: { bg: 'bg-danger-light', fg: 'text-danger', ring: 'ring-danger/30' },
 }
 
-export default function WorkflowNode({ data }) {
+export default function WorkflowNode({ id, data }) {
   const kind = KIND_STYLES[data.kind] || KIND_STYLES.action
   const Icon = ICONS[data.icon] || Sparkles
   const isRunning = data.status === 'running'
@@ -34,14 +34,24 @@ export default function WorkflowNode({ data }) {
         <div className={`w-9 h-9 rounded-lg flex items-center justify-center shrink-0 ${kind.bg} ${kind.fg}`}>
           {isRunning ? <Loader2 size={16} className="animate-spin" /> : <Icon size={16} />}
         </div>
-        <div className="min-w-0">
+        <div className="min-w-0 flex-1">
           <p className="text-sm font-semibold text-ink truncate">{data.title}</p>
           <p className="text-xs text-ink-soft truncate">{data.subtitle}</p>
         </div>
         {isDone && (
-          <CheckCircle2 size={16} className="text-success shrink-0 ml-auto" />
+          <CheckCircle2 size={16} className="text-success shrink-0" />
         )}
       </div>
+      <button
+        type="button"
+        onClick={(event) => {
+          event.stopPropagation()
+          window.dispatchEvent(new CustomEvent('agentforge:configure-node', { detail: { id } }))
+        }}
+        className="mt-2 inline-flex items-center justify-center w-full rounded-control border border-border px-2 py-1.5 text-[11px] font-medium text-ink-soft hover:bg-canvas hover:text-primary transition-colors"
+      >
+        Configure
+      </button>
       <Handle type="source" position={Position.Right} />
     </div>
   )
