@@ -41,6 +41,24 @@ describe('Google OAuth demo mode', () => {
     expect(googleConfigured()).toBe(true)
     expect(isDemoClient()).toBe(false)
   })
+
+  it('forces fresh consent for Gmail reconnects', async () => {
+    const { googleAuthLoginUrl } = await loadOauth({
+      GOOGLE_CLIENT_ID: '1234.apps.googleusercontent.com',
+      GOOGLE_CLIENT_SECRET: 'GOCSPX-real-secret',
+      GOOGLE_AUTH_REDIRECT_URI: 'https://example.com/api/auth/google/callback',
+      NODE_ENV: 'production',
+    })
+    const url = new URL(googleAuthLoginUrl('state-fresh', {
+      gmail: true,
+      email: 'user@example.com',
+    }))
+    expect(url.searchParams.get('scope')).toBe('https://www.googleapis.com/auth/gmail.readonly')
+    expect(url.searchParams.get('prompt')).toBe('consent')
+    expect(url.searchParams.get('access_type')).toBe('offline')
+    expect(url.searchParams.get('approval_prompt')).toBe('force')
+    expect(url.searchParams.get('include_granted_scopes')).toBe('false')
+  })
 })
 
 
