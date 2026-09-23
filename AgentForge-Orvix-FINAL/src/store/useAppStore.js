@@ -519,7 +519,7 @@ export const useAppStore = create((set, get) => ({
     try {
       const response = await apiRequest('/auth/signup', { method: 'POST', body: { name, email, password } })
       setApiToken(response.token, remember)
-      set((state) => ({ ...state, isAuthenticated: true, userEmail: response.user.email, userName: response.user.name, workflows: state.workflows, notifications: response.notifications || state.notifications, emailNotifications: response.user.emailNotifications !== false, gmailConnected: response.user.gmailConnected === true, lastError: null }))
+      set((state) => ({ ...state, isAuthenticated: true, userEmail: response.user.email, userName: response.user.name, workflows: state.workflows, notifications: response.notifications || state.notifications, emailNotifications: response.user.emailNotifications !== false, gmailConnected: response.user.gmailConnected === true, gmailEmail: response.user.gmailEmail || '', lastError: null }))
       persistState(get())
       if (remember) saveStoredSession({ email: response.user.email })
       else saveStoredSession(null)
