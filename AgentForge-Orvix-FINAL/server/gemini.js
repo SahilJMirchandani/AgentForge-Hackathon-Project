@@ -458,7 +458,7 @@ function deterministicAgentFallback({ instructions, input, workflow }) {
     const lines = input.messages.map((message, index) => {
       const sender = String(message.from || 'Unknown sender')
       const subject = String(message.subject || '(No subject)')
-      const body = String(message.body || message.snippet || '').replace(/\\s+/g, ' ').trim()
+      const body = String(message.body || message.snippet || '').replace(/\s+/g, ' ').trim()
       const excerpt = body.length > 220 ? `${body.slice(0, 220)}…` : body
       const urgency = /urgent|action needed|deadline|before|asap|required|issue|problem|latency/i.test(`${subject} ${body}`)
         ? 'Action item'
@@ -470,7 +470,7 @@ function deterministicAgentFallback({ instructions, input, workflow }) {
 
   const text = typeof input === 'string' ? input : JSON.stringify(input)
   const instruction = String(instructions || '').toLowerCase()
-  const compact = text.replace(/\\s+/g, ' ').trim()
+  const compact = text.replace(/\s+/g, ' ').trim()
   if (/summariz|summary/.test(instruction)) {
     return compact.length <= 400 ? compact : `${compact.slice(0, 380)}…`
   }
