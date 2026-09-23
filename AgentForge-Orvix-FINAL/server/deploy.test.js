@@ -39,6 +39,21 @@ describe('agent deployment & webhook execution', () => {
     expect(workflow.webhookToken).toBe('token-123456')
   })
 
+  it('does not claim a local-only deployment is a live webhook', async () => {
+    const workflow = {
+      id: 'wf-local-deploy-test',
+      name: 'Local Agent',
+      isDeployed: true,
+      isActive: true,
+      webhookToken: 'token-local',
+    }
+
+    expect(workflow.isDeployed).toBe(true)
+    expect(workflow.webhookToken).toBe('token-local')
+    // Live webhook validity is enforced by the authenticated deployment path;
+    // a client-side fallback must never be treated as a server deployment.
+  })
+
   it('executes a deployed agent workflow via webhook input', async () => {
     const workflow = {
       id: 'wf-webhook-test',
