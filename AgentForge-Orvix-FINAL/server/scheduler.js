@@ -44,10 +44,10 @@ export function startScheduler({ db, executeWorkflow, saveDb, notify, intervalMs
         }
         workflow.lastScheduledRunAt = now
         const input = schedule.gmail
-          ? { trigger: 'gmail-poll', gmailQuery: `after:${Math.floor(Number(workflow.gmailLastSeenAt) / 1000)}` }
+          ? { trigger: 'gmail-poll', gmailQuery: `after:${Math.max(0, Math.floor((Number(workflow.gmailLastSeenAt) - 2000) / 1000))}` }
           : { trigger: 'schedule', scheduledAt: now }
         const run = await executeWorkflow(workflow, owner, input)
-        if (schedule.gmail && run.gmailNewestMessageAt) workflow.gmailLastSeenAt = run.gmailNewestMessageAt
+        if (schedule.gmail && run.status === 'Completed' && run.gmailNewestMessageAt) workflow.gmailLastSeenAt = run.gmailNewestMessageAt
         if (!run.skipNotifications) {
           notify(owner, run.status === 'Completed' ? (schedule.gmail ? 'New email processed' : 'Scheduled agent completed') : (schedule.gmail ? 'Email agent failed' : 'Scheduled agent failed'), run.status === 'Completed' ? (schedule.gmail ? `${workflow.name} detected and processed a new email.` : `${workflow.name} completed its scheduled run.`) : run.error)
         }
