@@ -272,8 +272,10 @@ async function handle(req, res) {
     if ((req.method === 'GET' || req.method === 'POST') && url.pathname === '/api/auth/google') {
       if (!googleConfigured()) return json(res, 503, { error: 'Google OAuth is not configured on the server. Please set GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET in .env.' }, allowedOrigin)
       const state = randomBytes(24).toString('hex')
-      db.oauthStates[state] = { type: 'login', expiresAt: Date.now() + 10 * 60 * 1000 }
-      const googleUrl = googleAuthLoginUrl(state)
+      const publicOrigin = appConfig.publicApiOrigin || `${req.headers['x-forwarded-proto'] || 'https' }://${req.headers.host}`
+      const redirectUri = `${publicOrigin.replace(/\/$/, '')}/api/auth/google/callback`
+      db.oauthStates[state] = { type: 'login', redirectUri, expiresAt: Date.now() + 10 * 60 * 1000 }
+      const googleUrl = googleAuthLoginUrl(state, { redirectUri })
       saveDb(db).catch((error) => console.warn(`Google login state persistence warning: ${error.message}`))
       if (req.method === 'POST') {
         return json(res, 200, { url: googleUrl }, allowedOrigin, { 'set-cookie': `agentforge-google-auth-state=${state}; HttpOnly; SameSite=Lax; Path=/api/auth/google; Max-Age=600` })
@@ -283,16 +285,6 @@ async function handle(req, res) {
         'set-cookie': `agentforge-google-auth-state=${state}; HttpOnly; SameSite=Lax; Path=/api/auth/google; Max-Age=600`,
       })
       return res.end()
-    }
-    if (req.method === 'POST' && url.pathname === '/api/auth/google/gmail') {
-      const user = requireUser(req, res)
-      if (!user) return
-      if (!googleConfigured()) return json(res, 503, { error: 'Google OAuth is not configured on the server.' }, allowedOrigin)
-      const state = randomBytes(24).toString('hex')
-      db.oauthStates[state] = { type: 'gmail', email: user.email, expiresAt: Date.now() + 10 * 60 * 1000 }
-      const googleUrl = googleAuthLoginUrl(state, { gmail: true, email: user.email })
-      saveDb(db).catch((error) => console.warn(`Gmail OAuth state persistence warning: ${error.message}`))
-      return json(res, 200, { url: googleUrl }, allowedOrigin)
     }
     if (req.method === 'GET' && url.pathname === '/api/auth/google/callback') {
       const stateKey = url.searchParams.get('state')
@@ -312,7 +304,7 @@ async function handle(req, res) {
       try {
         const code = url.searchParams.get('code')
         if (!code) throw new Error('Authorization code missing from Google callback')
-        const tokenResult = await exchangeGoogleAuthCode(code)
+        const tokenResult = await exchangeGoogleAuthCode(code, state.redirectUri || '')
 
         if (state.type === 'gmail') {
           const user = db.users[state.email]
