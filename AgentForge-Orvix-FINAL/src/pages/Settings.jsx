@@ -149,7 +149,7 @@ export default function Settings() {
               <p className="text-sm font-medium text-ink">Gmail connection</p>
               <p className="text-xs text-ink-soft mt-1">
                 {gmailConnectedLocal
-                  ? `Connected${gmailEmailLocal ? `: ${gmailEmailLocal}` : ''}. Email agents can read unread messages from this Gmail account.`
+                  ? `Connected${gmailEmailLocal ? `: ${gmailEmailLocal}` : ''}. Email agents can monitor newly arrived messages from this Gmail account.`
                   : 'Connect Gmail only when you want an email agent to read your inbox. Google sign-in itself does not require Gmail access.'}
               </p>
             </div>
