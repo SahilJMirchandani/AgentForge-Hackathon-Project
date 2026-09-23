@@ -172,6 +172,9 @@ export async function executeWorkflow(workflow, user, input = {}) {
           }
 
           if (!messages.length && input?.trigger === 'gmail-poll') run.skipNotifications = true
+        } else {
+          context = input
+        }
       } else if (node.data?.kind === 'ai') {
         if (run.skipNotifications) {
           context = context
