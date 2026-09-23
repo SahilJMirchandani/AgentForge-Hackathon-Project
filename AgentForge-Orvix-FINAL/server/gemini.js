@@ -454,6 +454,20 @@ export function geminiStatus() {
 }
 
 function deterministicAgentFallback({ instructions, input, workflow }) {
+  if (input?.source === 'demo-inbox' && Array.isArray(input.messages)) {
+    const lines = input.messages.map((message, index) => {
+      const sender = String(message.from || 'Unknown sender')
+      const subject = String(message.subject || '(No subject)')
+      const body = String(message.body || message.snippet || '').replace(/\\s+/g, ' ').trim()
+      const excerpt = body.length > 220 ? `${body.slice(0, 220)}…` : body
+      const urgency = /urgent|action needed|deadline|before|asap|required|issue|problem|latency/i.test(`${subject} ${body}`)
+        ? 'Action item'
+        : 'Informational'
+      return `${index + 1}. ${subject} — ${sender}\n   ${urgency}: ${excerpt}`
+    })
+    return `Demo inbox summary (\\${input.count || input.messages.length} messages)\\n\\n${lines.join('\\n\\n')}`
+  }
+
   const text = typeof input === 'string' ? input : JSON.stringify(input)
   const instruction = String(instructions || '').toLowerCase()
   const compact = text.replace(/\\s+/g, ' ').trim()
@@ -461,8 +475,8 @@ function deterministicAgentFallback({ instructions, input, workflow }) {
     return compact.length <= 400 ? compact : `${compact.slice(0, 380)}…`
   }
   if (/sentiment|tone|positive|negative/.test(instruction)) {
-    const negative = (compact.match(/\b(angry|bad|hate|poor|late|broken|refund|terrible|negative|disappointed)\b/gi) || []).length
-    const positive = (compact.match(/\b(good|great|love|excellent|fast|easy|happy|positive|amazing|helpful)\b/gi) || []).length
+    const negative = (compact.match(/\\b(angry|bad|hate|poor|late|broken|refund|terrible|negative|disappointed)\\b/gi) || []).length
+    const positive = (compact.match(/\\b(good|great|love|excellent|fast|easy|happy|positive|amazing|helpful)\\b/gi) || []).length
     return positive > negative ? 'Positive sentiment detected.' : negative > positive ? 'Negative sentiment detected.' : 'Neutral or uncertain sentiment.'
   }
   if (/extract.*(action|task)|action item/.test(instruction)) {
