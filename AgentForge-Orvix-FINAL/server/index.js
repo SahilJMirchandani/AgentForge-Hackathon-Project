@@ -341,8 +341,8 @@ async function handle(req, res) {
             throw new Error('Google authorized the account, but AgentForge could not verify the Gmail inbox. Please reconnect Gmail and try again.')
           }
           const gmailProfile = await gmailProfileResponse.json()
-          const gmailAddress = normalizeEmail(gmailProfile?.emailAddress)
-          if (gmailAddress && gmailAddress !== normalizeEmail(user.email)) {
+          const gmailAddress = String(gmailProfile?.emailAddress || '').trim().toLowerCase()
+          if (gmailAddress && gmailAddress !== String(user.email || '').trim().toLowerCase()) {
             throw new Error(`The connected Gmail account (${gmailAddress}) does not match your AgentForge account (${user.email}). Select the same Google account and connect Gmail again.`)
           }
           // The Gmail API validation above is authoritative; Google's token response
