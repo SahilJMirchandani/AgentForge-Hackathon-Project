@@ -140,7 +140,24 @@ export async function refreshGoogleAccessToken(refreshToken) {
   } finally {
     clearTimeout(timeout)
   }
-  if (!response.ok) throw new Error(`Google token refresh failed (${response.status})`)
+  if (!response.ok) {
+    const detail = await response.text().catch(() => '')
+    let providerError = ''
+    let providerDescription = ''
+    try {
+      const payload = JSON.parse(detail)
+      providerError = payload?.error || ''
+      providerDescription = payload?.error_description || ''
+    } catch {}
+    const error = new Error(
+      response.status === 400 && providerError === 'invalid_grant'
+        ? 'Google Gmail authorization has expired or been revoked. Please use Reconnect Gmail in Settings.'
+        : `Google token refresh failed (${response.status})${providerDescription ? `: ${providerDescription}` : ''}`,
+    )
+    error.status = response.status
+    error.providerError = providerError
+    throw error
+  }
   const token = await response.json()
   if (!token.access_token) throw new Error('Google did not return a refreshed access token')
   return token
