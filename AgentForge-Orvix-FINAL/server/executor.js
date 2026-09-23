@@ -148,6 +148,10 @@ export async function executeWorkflow(workflow, user, input = {}) {
               if (refreshed.refresh_token) user.gmailRefreshToken = refreshed.refresh_token
             }
             messages = await fetchGmailMessages(user.gmailAccessToken, 20, gmailQuery)
+            if (input?.trigger === 'gmail-poll' && Number.isFinite(Number(input?.gmailSince))) {
+              const since = Number(input.gmailSince)
+              messages = messages.filter((message) => Number(message.internalDate || 0) > since)
+            }
           } catch (gmailError) {
             if ((gmailError.status === 401 || gmailError.status === 403) && user.gmailRefreshToken) {
               try {
@@ -155,11 +159,14 @@ export async function executeWorkflow(workflow, user, input = {}) {
                 user.gmailAccessToken = refreshed.access_token
                 user.gmailTokenExpiresAt = Date.now() + Number(refreshed.expires_in || 3600) * 1000
                 if (refreshed.refresh_token) user.gmailRefreshToken = refreshed.refresh_token
-                messages = await fetchGmailMessages(user.gmailAccessToken, 10, gmailQuery)
+                messages = await fetchGmailMessages(user.gmailAccessToken, 20, gmailQuery)
+                if (input?.trigger === 'gmail-poll' && Number.isFinite(Number(input?.gmailSince))) {
+                  const since = Number(input.gmailSince)
+                  messages = messages.filter((message) => Number(message.internalDate || 0) > since)
+                }
               } catch (refreshError) {
                 refreshError.status = refreshError.status || gmailError.status
                 if (
-                  refreshError.status === 400 ||
                   refreshError.providerError === 'invalid_grant' ||
                   refreshError.providerReason === 'insufficientAuthenticationScopes' ||
                   /insufficient authentication scopes/i.test(refreshError.message || '')
