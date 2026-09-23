@@ -814,8 +814,14 @@ export const useAppStore = create((set, get) => ({
   async deployWorkflow(workflowId) {
     const targetWorkflow = get().getWorkflow(workflowId)
     if (!targetWorkflow) throw new Error('Workflow not found')
+    if (!getApiToken()) {
+      throw new Error('A server session is required to deploy an agent and receive a live webhook endpoint.')
+    }
+
     const wasDeployed = targetWorkflow.isDeployed === true
-    const generatedToken = targetWorkflow.webhookToken || `hook-${Math.random().toString(36).substring(2, 10)}${Date.now().toString(36)}`
+    const wasActive = targetWorkflow.isActive !== false
+    const previousWebhookToken = targetWorkflow.webhookToken || null
+    const generatedToken = previousWebhookToken || `hook-${Math.random().toString(36).substring(2, 10)}${Date.now().toString(36)}`
 
     set((state) => {
       const nextState = {
@@ -831,29 +837,27 @@ export const useAppStore = create((set, get) => ({
         method: 'POST',
         body: { ...targetWorkflow, isDeployed: true, isActive: true, webhookToken: generatedToken },
       })
-      if (!response.workflow) return { workflow: get().getWorkflow(workflowId), webhookUrl: response.webhookUrl || getApiUrl(`/hooks/${generatedToken}`) }
+      if (!response.workflow) {
+        throw new Error('The server did not return a deployed workflow. Please try deploying again.')
+      }
       const normalized = normalizeWorkflow(response.workflow)
       lastServerWorkflowSnapshots.set(normalized.id, JSON.stringify(normalized))
       set((state) => ({ ...state, workflows: state.workflows.map((current) => current.id === workflowId ? normalized : current), lastError: null }))
       if (response.notifications) set({ notifications: response.notifications })
       persistState(get())
-      return response
-    } catch (error) {
-      if (!getApiToken()) {
-        const updatedWorkflow = get().getWorkflow(workflowId)
-        set({ lastError: null })
-        get().addNotification({
-          id: `notif-${Date.now()}`,
-          title: 'Agent deployed',
-          message: `"${updatedWorkflow?.name || 'Agent'}" is live and ready to receive webhook events.`,
-          read: false,
-        })
-        const webhookUrl = getApiUrl(`/hooks/${generatedToken}`)
-        return { workflow: updatedWorkflow, webhookUrl }
+      return {
+        ...response,
+        webhookUrl: response.webhookUrl || getApiUrl(`/hooks/${normalized.webhookToken}`),
       }
+    } catch (error) {
       set((state) => ({
         ...state,
-        workflows: state.workflows.map((current) => current.id === workflowId ? { ...current, isDeployed: wasDeployed } : current),
+        workflows: state.workflows.map((current) => current.id === workflowId ? {
+          ...current,
+          isDeployed: wasDeployed,
+          isActive: wasActive,
+          webhookToken: previousWebhookToken,
+        } : current),
         lastError: error.message || 'Unable to deploy this agent',
       }))
       persistState(get())
