@@ -37,8 +37,10 @@ email provider for deployed services; configure `BREVO_API_KEY` and a
 verified `BREVO_FROM` sender. Resend remains available as a fallback, while
 SMTP is available for local development.
 `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN` and `TWILIO_FROM_NUMBER` enable
-SMS notifications. Google OAuth settings enable Google sign-in, and Slack
-webhook URLs can be configured on output nodes.
+SMS notifications. Google OAuth settings are optional and are not required for
+the built-in email demo. Slack webhook URLs can be configured on output nodes.
+Email/inbox agents use a deterministic built-in demo inbox so the complete agent
+execution flow can be demonstrated without connecting a real Gmail account.
 Deployed agents with schedule triggers are executed by the server scheduler.
 Set `PORT`, `HOST`, `CLIENT_ORIGIN`, `API_PUBLIC_URL`, or `VITE_API_URL` to
 override defaults. Set `API_PUBLIC_URL` to the public API origin whenever the
@@ -71,7 +73,7 @@ single scheduler instance unless a distributed lock is added.
 - **History** (`/history`) — table of workflows and individual completed runs
   with status/date/duration, filterable by status.
 - **Settings** (`/settings`) — local profile, notification preference, saved
-  session, and logout controls.
+  session, demo inbox status, and logout controls.
 
 ## Checking your configuration
 
@@ -87,7 +89,9 @@ instead of surfacing later as a silently simulated notification.
 
 Google sign-in has a demo mode for local development that skips the OAuth
 handshake and returns a fixed account. It is only active when
-`ALLOW_DEMO_OAUTH=true`, and never in production.
+`ALLOW_DEMO_OAUTH=true`, and never in production. Gmail OAuth remains an optional
+backend capability; the presentation email workflow uses the built-in demo inbox
+and does not require a Gmail connection.
 
 ## Notifications
 
@@ -139,7 +143,9 @@ delivery (Brevo HTTPS with Resend and SMTP fallbacks), and IP-based rate limitin
 deployed agent accepts `POST` JSON payloads at
 `/api/hooks/:token`; the token is shown in the workflow editor after deployment.
 Google sign-in uses `/api/auth/google` and requires the callback URL configured
-in Google Cloud Console to match `GOOGLE_AUTH_REDIRECT_URI`.
+in Google Cloud Console to match `GOOGLE_AUTH_REDIRECT_URI`. Gmail OAuth remains
+an optional backend capability; the presentation email workflow uses the built-in
+demo inbox and does not require a Gmail connection.
 The frontend store synchronizes authenticated workflow mutations to the API.
 `GET /api/health` is a liveness check and `GET /api/ready` is the deployment
 readiness check. The Gemini, MongoDB, email-provider, and SMTP credentials are read only by the
