@@ -21,15 +21,15 @@ const emailAutomation = {
   logSteps: [
     'Email input received',
     'Email content prepared',
-    '4 important messages identified',
-    '2 urgent items detected',
-    '2 tasks created',
+    '3 demo messages loaded',
+    '2 action items detected',
+    '2 follow-up tasks identified',
     'Notification sent',
   ],
   results: [
-    { label: 'Important Emails Found', value: 4, icon: 'Mail' },
-    { label: 'Urgent Items', value: 2, icon: 'AlertTriangle' },
-    { label: 'Tasks Created', value: 2, icon: 'CheckSquare' },
+    { label: 'Demo Emails Processed', value: 3, icon: 'Mail' },
+    { label: 'Action Items', value: 2, icon: 'AlertTriangle' },
+    { label: 'Follow-up Tasks', value: 2, icon: 'CheckSquare' },
   ],
 }
 
