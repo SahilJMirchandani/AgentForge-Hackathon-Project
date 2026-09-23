@@ -83,11 +83,34 @@ export async function fetchGmailMessages(accessToken, limit = 10, query = 'is:un
     try { return await fetch(url, { headers: { authorization: `Bearer ${accessToken}` }, signal: controller.signal }) } finally { clearTimeout(timeout) }
   }
   const response = await fetchGmail(`https://gmail.googleapis.com/gmail/v1/users/me/messages?maxResults=${Math.min(20, Math.max(1, limit))}&q=${encodeURIComponent(query)}`)
-  if (!response.ok) throw new Error(`Gmail request failed (${response.status})`)
+  if (!response.ok) {
+    const detail = await response.text().catch(() => '')
+    let reason = ''
+    try {
+      const payload = JSON.parse(detail)
+      reason = payload?.error?.message || payload?.error?.status || payload?.error?.errors?.[0]?.reason || ''
+    } catch {}
+    const error = new Error(
+      response.status === 401
+        ? 'Gmail authorization expired. Reconnect Gmail in Settings.'
+        : response.status === 403
+          ? `Gmail access was denied by Google${reason ? ` (${reason})` : ''}. Reconnect Gmail and make sure the Gmail API is enabled for the same Google Cloud project.`
+          : `Gmail request failed (${response.status})`,
+    )
+    error.status = response.status
+    error.providerDetail = detail.slice(0, 500)
+    throw error
+  }
   const listing = await response.json()
   const messages = await Promise.all((listing.messages || []).slice(0, limit).map(async ({ id }) => {
     const messageResponse = await fetchGmail(`https://gmail.googleapis.com/gmail/v1/users/me/messages/${encodeURIComponent(id)}?format=full`)
-    if (!messageResponse.ok) throw new Error(`Gmail message request failed (${messageResponse.status})`)
+    if (!messageResponse.ok) {
+      const detail = await messageResponse.text().catch(() => '')
+      const error = new Error(`Gmail message request failed (${messageResponse.status})`)
+      error.status = messageResponse.status
+      error.providerDetail = detail.slice(0, 500)
+      throw error
+    }
     const message = await messageResponse.json()
     return { id: message.id, internalDate: message.internalDate || null, snippet: message.snippet || '', body: extractGmailBody(message.payload) || message.snippet || '', headers: message.payload?.headers || [] }
   }))
