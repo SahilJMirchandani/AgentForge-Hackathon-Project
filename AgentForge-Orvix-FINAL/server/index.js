@@ -312,9 +312,10 @@ async function handle(req, res) {
       const state = db.oauthStates[stateKey]
       const errorParam = url.searchParams.get('error')
       if (errorParam) {
+        const providerMessage = url.searchParams.get('error_description') || errorParam
         const cancelledDestination = state?.type === 'gmail'
-          ? '/settings?gmail=error'
-          : '/login?error=' + encodeURIComponent('Google sign-in was cancelled')
+          ? '/settings?gmail=error&message=' + encodeURIComponent(providerMessage)
+          : '/login?error=' + encodeURIComponent(providerMessage || 'Google sign-in was cancelled')
         res.writeHead(302, { location: CLIENT_ORIGIN.replace(/\/$/, '') + cancelledDestination })
         return res.end()
       }
@@ -332,16 +333,25 @@ async function handle(req, res) {
           if (!user) throw new Error('Your AgentForge account could not be found. Please sign in again.')
           // Validate the newly issued token before replacing an existing Gmail connection.
           // This prevents an old profile-only token from surviving a failed Gmail grant.
-          const grantedScopes = String(tokenResult.scope || '').split(/\s+/).filter(Boolean)
-          if (!grantedScopes.includes(GMAIL_READONLY_SCOPE)) {
-            throw new Error('Google did not grant Gmail read access. Reconnect Gmail and approve the Gmail read permission.')
-          }
           await validateGmailAccessToken(tokenResult.access_token)
-          if (!tokenResult.refresh_token) {
-            throw new Error('Google did not issue a fresh Gmail authorization token. Remove AgentForge from your Google Account connected apps, then connect Gmail again and approve Gmail read access.')
+          const gmailProfileResponse = await fetch('https://gmail.googleapis.com/gmail/v1/users/me/profile', {
+            headers: { authorization: `Bearer ${tokenResult.access_token}` },
+          })
+          if (!gmailProfileResponse.ok) {
+            throw new Error('Google authorized the account, but AgentForge could not verify the Gmail inbox. Please reconnect Gmail and try again.')
           }
+          const gmailProfile = await gmailProfileResponse.json()
+          const gmailAddress = normalizeEmail(gmailProfile?.emailAddress)
+          if (gmailAddress && gmailAddress !== normalizeEmail(user.email)) {
+            throw new Error(`The connected Gmail account (${gmailAddress}) does not match your AgentForge account (${user.email}). Select the same Google account and connect Gmail again.`)
+          }
+          // The Gmail API validation above is authoritative; Google's token response
+          // may omit the optional `scope` field even when the requested scope was granted.
           user.gmailAccessToken = tokenResult.access_token
-          user.gmailRefreshToken = tokenResult.refresh_token
+          if (tokenResult.refresh_token) user.gmailRefreshToken = tokenResult.refresh_token
+          if (!user.gmailRefreshToken) {
+            throw new Error('Google authorized Gmail, but did not provide offline refresh access. Reconnect Gmail once more and approve the requested Gmail permission.')
+          }
           user.gmailTokenExpiresAt = Date.now() + Number(tokenResult.expires_in || 3600) * 1000
           delete db.oauthStates[stateKey]
           await saveDb(db)
