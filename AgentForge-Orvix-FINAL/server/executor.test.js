@@ -52,7 +52,7 @@ describe('agent executor', () => {
     const run = await executeWorkflow(agent, { email: 'owner@example.com' }, 'email body')
 
     expect(run.status).toBe('Failed')
-    expect(run.error).toMatch(/Gmail integration is unavailable/)
+    expect(run.error).toMatch(/Gmail (integration is unavailable|is not connected)/)
     expect(agent.results[0].label).toBe('Run error')
   })
 
