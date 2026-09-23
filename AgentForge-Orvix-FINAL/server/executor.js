@@ -213,7 +213,7 @@ export async function executeWorkflow(workflow, user, input = {}) {
           step.output = { delivered: false, skipped: true, channel, reason: 'Email notifications are turned off in Settings' }
           run.notifications.push(step.output)
         } else {
-          const result = await deliverNotificationWithDeadline({ node, user, workflow, output: formatResultValue(context), prompt: workflow.prompt })
+          const result = await deliverNotificationWithDeadline({ node, user, workflow, output: formatResultValue(context), prompt: workflow.prompt, input })
           if (result.error) throw new Error(result.error)
           step.output = {
             delivered: result.delivered,
