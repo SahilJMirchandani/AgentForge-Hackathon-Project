@@ -83,7 +83,6 @@ export function googleAuthLoginUrl(state, { gmail = false, email = '', redirectU
     include_granted_scopes: 'false',
     ...(String(email || '').trim() ? { login_hint: String(email).trim() } : {}),
     prompt: gmail ? 'consent' : 'select_account',
-    ...(gmail ? { approval_prompt: 'force' } : {}),
   })
   return `${GOOGLE_AUTH_URL}?${params}`
 }
