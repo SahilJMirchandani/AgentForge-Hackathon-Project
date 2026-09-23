@@ -53,6 +53,7 @@ const sanitizeText = (value, maxLength = 200) => String(value ?? '').replace(/[\
 const normalizeEmail = (value) => sanitizeText(value, 254).toLowerCase()
 const allowedOrigins = appConfig.allowedOrigins
 const getAllowedOrigin = (requestOrigin) => (requestOrigin && allowedOrigins.includes(requestOrigin) ? requestOrigin : null)
+const oauthClientOrigin = (req) => getAllowedOrigin(String(req.headers.origin || '').trim()) || CLIENT_ORIGIN
 
 const json = (res, status, body, origin, extraHeaders = {}) => {
   const headers = {
@@ -275,7 +276,7 @@ async function handle(req, res) {
       const forwardedProto = String(req.headers['x-forwarded-proto'] || '').split(',')[0].trim() || 'https'
       const publicOrigin = appConfig.publicApiOrigin || `${forwardedProto}://${req.headers.host}`
       const redirectUri = `${publicOrigin.replace(/\/$/, '')}/api/auth/google/callback`
-      db.oauthStates[state] = { type: 'login', redirectUri, expiresAt: Date.now() + 10 * 60 * 1000 }
+      db.oauthStates[state] = { type: 'login', redirectUri, clientOrigin: oauthClientOrigin(req), expiresAt: Date.now() + 10 * 60 * 1000 }
       const googleUrl = googleAuthLoginUrl(state, { redirectUri })
       await saveDb(db).catch((error) => console.warn(`Google login state persistence warning: ${error.message}`))
       if (req.method === 'POST') {
@@ -301,6 +302,7 @@ async function handle(req, res) {
         type: 'gmail',
         email: user.email,
         redirectUri,
+        clientOrigin: oauthClientOrigin(req),
         expiresAt: Date.now() + 10 * 60 * 1000,
       }
       const googleUrl = googleAuthLoginUrl(state, { gmail: true, email: user.gmailEmail || '', redirectUri })
@@ -316,11 +318,11 @@ async function handle(req, res) {
         const cancelledDestination = state?.type === 'gmail'
           ? '/settings?gmail=error&message=' + encodeURIComponent(providerMessage)
           : '/login?error=' + encodeURIComponent(providerMessage || 'Google sign-in was cancelled')
-        res.writeHead(302, { location: CLIENT_ORIGIN.replace(/\/$/, '') + cancelledDestination })
+        res.writeHead(302, { location: (state?.clientOrigin || CLIENT_ORIGIN).replace(/\/$/, '') + cancelledDestination })
         return res.end()
       }
       if (!state || state.expiresAt <= Date.now() || !['login', 'gmail'].includes(state.type)) {
-        res.writeHead(302, { location: `${CLIENT_ORIGIN.replace(/\/$/, '')}/login?error=${encodeURIComponent('Google authentication state is invalid or expired')}` })
+        res.writeHead(302, { location: `${(state?.clientOrigin || CLIENT_ORIGIN).replace(/\/$/, '')}/login?error=${encodeURIComponent('Google authentication state is invalid or expired')}` })
         return res.end()
       }
       try {
@@ -354,7 +356,7 @@ async function handle(req, res) {
           user.gmailTokenExpiresAt = Date.now() + Number(tokenResult.expires_in || 3600) * 1000
           delete db.oauthStates[stateKey]
           await saveDb(db)
-          res.writeHead(302, { location: CLIENT_ORIGIN.replace(/\/$/, '') + '/settings?gmail=connected&gmailEmail=' + encodeURIComponent(user.gmailEmail || '') })
+          res.writeHead(302, { location: (state.clientOrigin || CLIENT_ORIGIN).replace(/\/$/, '') + '/settings?gmail=connected&gmailEmail=' + encodeURIComponent(user.gmailEmail || '') })
           return res.end()
         }
 
@@ -381,14 +383,14 @@ async function handle(req, res) {
         delete db.oauthStates[stateKey]
         const token = tokenFor(normalized)
         saveDb(db).catch((error) => console.warn(`Google auth persistence warning: ${error.message}`))
-        res.writeHead(302, { location: `${CLIENT_ORIGIN.replace(/\/$/, '')}/login?token=${encodeURIComponent(token)}` })
+        res.writeHead(302, { location: `${(state.clientOrigin || CLIENT_ORIGIN).replace(/\/$/, '')}/login?token=${encodeURIComponent(token)}` })
         return res.end()
       } catch (error) {
         console.error('Google Auth Callback Error:', error.message)
         const failureDestination = state.type === 'gmail'
           ? '/settings?gmail=error&message=' + encodeURIComponent(error.message || 'Gmail connection failed')
           : '/login?error=' + encodeURIComponent(error.message || 'Google sign-in failed')
-        res.writeHead(302, { location: CLIENT_ORIGIN.replace(/\/$/, '') + failureDestination })
+        res.writeHead(302, { location: (state.clientOrigin || CLIENT_ORIGIN).replace(/\/$/, '') + failureDestination })
         return res.end()
       }
     }
