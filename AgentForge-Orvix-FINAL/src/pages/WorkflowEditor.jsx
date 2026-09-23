@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useParams, useNavigate, Link } from 'react-router-dom'
 import {
   ReactFlow, Background, Controls, applyNodeChanges, applyEdgeChanges, addEdge,
@@ -80,6 +80,15 @@ export default function WorkflowEditor() {
   const [runInput, setRunInput] = useState(workflow?.prompt || '')
   const [selectedNodeId, setSelectedNodeId] = useState(null)
   const [nodeSaveStatus, setNodeSaveStatus] = useState('')
+
+  useEffect(() => {
+    function handleConfigureNode(event) {
+      const nodeId = event.detail?.id
+      if (nodeId && workflow?.nodes.some((node) => node.id === nodeId)) setSelectedNodeId(nodeId)
+    }
+    window.addEventListener('agentforge:configure-node', handleConfigureNode)
+    return () => window.removeEventListener('agentforge:configure-node', handleConfigureNode)
+  }, [workflow?.nodes])
 
   const onNodesChange = useCallback(
     (changes) => workflow && updateNodes(id, applyNodeChanges(changes, workflow.nodes)),
