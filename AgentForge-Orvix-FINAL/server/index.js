@@ -74,7 +74,7 @@ const json = (res, status, body, origin, extraHeaders = {}) => {
   res.writeHead(status, { ...headers, ...extraHeaders })
   res.end(JSON.stringify(body))
 }
-const publicUser = (user) => (user ? { id: user.id, name: user.name, email: user.email, emailNotifications: user.emailNotifications !== false, gmailConnected: Boolean(user.gmailRefreshToken || user.gmailAccessToken) } : null)
+const publicUser = (user) => (user ? { id: user.id, name: user.name, email: user.email, emailNotifications: user.emailNotifications !== false, gmailConnected: Boolean(user.gmailRefreshToken || user.gmailAccessToken), gmailEmail: user.gmailEmail || null } : null)
 const publicWorkflow = (workflow) => { if (!workflow || typeof workflow !== 'object') return null; const { userId, ...safeWorkflow } = workflow; return safeWorkflow }
 const hashPassword = (password, salt = randomBytes(16).toString('hex')) => ({ passwordSalt: salt, passwordHash: scryptSync(password, salt, 64).toString('hex') })
 const validPassword = (password, user) => { if (!user?.passwordSalt || !user?.passwordHash) return false; const actual = scryptSync(password, user.passwordSalt, 64); const expected = Buffer.from(user.passwordHash, 'hex'); return actual.length === expected.length && timingSafeEqual(actual, expected) }
@@ -303,7 +303,7 @@ async function handle(req, res) {
         redirectUri,
         expiresAt: Date.now() + 10 * 60 * 1000,
       }
-      const googleUrl = googleAuthLoginUrl(state, { gmail: true, email: user.email, redirectUri })
+      const googleUrl = googleAuthLoginUrl(state, { gmail: true, email: user.gmailEmail || '', redirectUri })
       await saveDb(db).catch((error) => console.warn(`Gmail OAuth state persistence warning: ${error.message}`))
       return json(res, 200, { url: googleUrl }, allowedOrigin)
     }
@@ -342,12 +342,11 @@ async function handle(req, res) {
           }
           const gmailProfile = await gmailProfileResponse.json()
           const gmailAddress = String(gmailProfile?.emailAddress || '').trim().toLowerCase()
-          if (gmailAddress && gmailAddress !== String(user.email || '').trim().toLowerCase()) {
-            throw new Error(`The connected Gmail account (${gmailAddress}) does not match your AgentForge account (${user.email}). Select the same Google account and connect Gmail again.`)
-          }
+          if (!gmailAddress) throw new Error('Google authorized Gmail, but AgentForge could not identify the connected Gmail address.')
           // The Gmail API validation above is authoritative; Google's token response
           // may omit the optional `scope` field even when the requested scope was granted.
           user.gmailAccessToken = tokenResult.access_token
+          user.gmailEmail = gmailAddress
           if (tokenResult.refresh_token) user.gmailRefreshToken = tokenResult.refresh_token
           if (!user.gmailRefreshToken) {
             throw new Error('Google authorized Gmail, but did not provide offline refresh access. Reconnect Gmail once more and approve the requested Gmail permission.')
