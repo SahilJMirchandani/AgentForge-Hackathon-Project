@@ -625,7 +625,7 @@ export const useAppStore = create((set, get) => ({
     set({ authHydrating: true })
     try {
       const response = await apiRequest('/me')
-      set((state) => ({ ...state, isAuthenticated: true, userEmail: response.user.email, userName: response.user.name, workflows: (response.workflows || []).map(normalizeWorkflow), notifications: response.notifications || DEFAULT_NOTIFICATIONS, emailNotifications: response.user.emailNotifications !== false, lastError: null }))
+      set((state) => ({ ...state, isAuthenticated: true, userEmail: response.user.email, userName: response.user.name, workflows: (response.workflows || []).map(normalizeWorkflow), notifications: response.notifications || DEFAULT_NOTIFICATIONS, emailNotifications: response.user.emailNotifications !== false, gmailConnected: response.user.gmailConnected === true, lastError: null }))
       persistState(get())
       set({ authHydrating: false })
       return true
