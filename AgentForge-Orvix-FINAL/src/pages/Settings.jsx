@@ -107,22 +107,6 @@ export default function Settings() {
           </>
         )}
 
-        <div className="border-t border-border pt-5">
-          <div className="flex items-start gap-3">
-            <div className="mt-0.5 h-8 w-8 rounded-control bg-primary-light flex items-center justify-center text-primary text-sm font-semibold">
-              ✦
-            </div>
-            <div>
-              <p className="text-sm font-medium text-ink">Demo email inbox</p>
-              <p className="text-xs text-ink-soft mt-1 leading-5">
-                Email and inbox agents use a built-in demo inbox for presentations and testing.
-                No Google or Gmail connection is required.
-              </p>
-              <p className="text-xs text-success font-medium mt-2">Ready to run</p>
-            </div>
-          </div>
-        </div>
-
         <div>
           <label className="text-xs font-medium text-ink-soft">In-app notifications</label>
           <div className="flex items-center gap-2 mt-1.5">
