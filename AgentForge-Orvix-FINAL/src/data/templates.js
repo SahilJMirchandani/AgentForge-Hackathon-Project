@@ -4,8 +4,8 @@
 const emailAutomation = {
   name: 'Email Automation Agent',
   nodes: [
-    { id: 'n1', type: 'workflow', position: { x: 40, y: 140 }, data: { kind: 'trigger', icon: 'Mail', title: 'Gmail Inbox Trigger', subtitle: 'When a new email arrives', instructions: 'Monitor the connected Gmail inbox for newly arrived messages.' } },
-    { id: 'n2', type: 'workflow', position: { x: 320, y: 140 }, data: { kind: 'action', icon: 'Inbox', title: 'Prepare Inbox', subtitle: 'Prepare new messages', instructions: 'Prepare newly arrived Gmail messages for analysis.' } },
+    { id: 'n1', type: 'workflow', position: { x: 40, y: 140 }, data: { kind: 'trigger', icon: 'Mail', title: 'Demo Inbox Trigger', subtitle: 'When a new email arrives', instructions: 'Monitor the built-in demo inbox for newly arrived messages.' } },
+    { id: 'n2', type: 'workflow', position: { x: 320, y: 140 }, data: { kind: 'action', icon: 'Inbox', title: 'Prepare Inbox', subtitle: 'Prepare new messages', instructions: 'Prepare newly arrived demo inbox messages for analysis.' } },
     { id: 'n3', type: 'workflow', position: { x: 600, y: 140 }, data: { kind: 'ai', icon: 'Sparkles', title: 'AI Summarizer', subtitle: 'Summarize & find important', instructions: 'Summarize the email and identify important messages.' } },
     { id: 'n4', type: 'workflow', position: { x: 880, y: 140 }, data: { kind: 'condition', icon: 'AlertTriangle', title: 'Urgency Check', subtitle: 'Is it urgent?', instructions: 'Continue when at least one newly arrived email is available.' } },
     { id: 'n5', type: 'workflow', position: { x: 700, y: 320 }, data: { kind: 'action', icon: 'CheckSquare', title: 'Create Task', subtitle: 'Add to task list', instructions: 'Create a task for each important item.' } },
