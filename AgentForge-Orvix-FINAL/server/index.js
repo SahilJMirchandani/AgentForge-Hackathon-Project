@@ -272,7 +272,8 @@ async function handle(req, res) {
     if ((req.method === 'GET' || req.method === 'POST') && url.pathname === '/api/auth/google') {
       if (!googleConfigured()) return json(res, 503, { error: 'Google OAuth is not configured on the server. Please set GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET in .env.' }, allowedOrigin)
       const state = randomBytes(24).toString('hex')
-      const publicOrigin = appConfig.publicApiOrigin || `${req.headers['x-forwarded-proto'] || 'https' }://${req.headers.host}`
+      const forwardedProto = String(req.headers['x-forwarded-proto'] || '').split(',')[0].trim() || 'https'
+      const publicOrigin = appConfig.publicApiOrigin || `${forwardedProto}://${req.headers.host}`
       const redirectUri = `${publicOrigin.replace(/\/$/, '')}/api/auth/google/callback`
       db.oauthStates[state] = { type: 'login', redirectUri, expiresAt: Date.now() + 10 * 60 * 1000 }
       const googleUrl = googleAuthLoginUrl(state, { redirectUri })
