@@ -136,17 +136,17 @@ export async function executeWorkflow(workflow, user, input = {}) {
         if (isEmailTrigger) {
           // Presentation/demo mode: use a deterministic built-in inbox instead of
           // requiring a live Google OAuth connection.
-          const query = input?.gmailQuery || 'is:unread'
+          const query = input?.emailQuery || 'is:unread'
           let messages = fetchDemoInboxMessages({ query, limit: 20 })
 
-          if (input?.trigger === 'gmail-poll' && Number.isFinite(Number(input?.gmailSince))) {
+          if (input?.trigger === 'email-poll' && Number.isFinite(Number(input?.emailSince))) {
             const since = Number(input.gmailSince)
             messages = messages.filter((message) => Number(message.internalDate || 0) > since)
           }
 
-          run.gmailMessageCount = messages.length
+          run.emailMessageCount = messages.length
           if (messages.length) {
-            run.gmailNewestMessageAt = Math.max(
+            run.emailNewestMessageAt = Math.max(
               ...messages.map((message) => Number(message.internalDate || 0)).filter(Boolean),
             ) || Date.now()
           }
@@ -171,7 +171,7 @@ export async function executeWorkflow(workflow, user, input = {}) {
             demo: true,
           }
 
-          if (!messages.length && input?.trigger === 'gmail-poll') run.skipNotifications = true
+          if (!messages.length && input?.trigger === 'email-poll') run.skipNotifications = true
         } else {
           context = input
         }
@@ -198,7 +198,7 @@ export async function executeWorkflow(workflow, user, input = {}) {
         }
       } else if (outputKinds.has(node.data?.kind)) {
         if (run.skipNotifications) {
-          step.output = { skipped: true, reason: 'No new Gmail messages arrived during this poll.' }
+          step.output = { skipped: true, reason: 'No new demo inbox messages arrived during this poll.' }
           step.status = 'Completed'
           step.completedAt = Date.now()
           continue
