@@ -86,9 +86,11 @@ export async function fetchGmailMessages(accessToken, limit = 10, query = 'is:un
   if (!response.ok) {
     const detail = await response.text().catch(() => '')
     let reason = ''
+    let providerReason = ''
     try {
       const payload = JSON.parse(detail)
       reason = payload?.error?.message || payload?.error?.status || payload?.error?.errors?.[0]?.reason || ''
+      providerReason = payload?.error?.errors?.[0]?.reason || payload?.error?.status || ''
     } catch {}
     const error = new Error(
       response.status === 401
@@ -99,6 +101,7 @@ export async function fetchGmailMessages(accessToken, limit = 10, query = 'is:un
     )
     error.status = response.status
     error.providerDetail = detail.slice(0, 500)
+    error.providerReason = providerReason
     throw error
   }
   const listing = await response.json()
