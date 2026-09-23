@@ -328,6 +328,12 @@ async function handle(req, res) {
         if (state.type === 'gmail') {
           const user = db.users[state.email]
           if (!user) throw new Error('Your AgentForge account could not be found. Please sign in again.')
+          // Validate the newly issued token before replacing an existing Gmail connection.
+          // This prevents an old profile-only token from surviving a failed Gmail grant.
+          await validateGmailAccessToken(tokenResult.access_token)
+          if (!tokenResult.refresh_token && !user.gmailRefreshToken) {
+            throw new Error('Google did not return a Gmail refresh token. Please reconnect Gmail and approve offline access.')
+          }
           user.gmailAccessToken = tokenResult.access_token
           if (tokenResult.refresh_token) user.gmailRefreshToken = tokenResult.refresh_token
           user.gmailTokenExpiresAt = Date.now() + Number(tokenResult.expires_in || 3600) * 1000
@@ -365,7 +371,7 @@ async function handle(req, res) {
       } catch (error) {
         console.error('Google Auth Callback Error:', error.message)
         const failureDestination = state.type === 'gmail'
-          ? '/settings?gmail=error'
+          ? '/settings?gmail=error&message=' + encodeURIComponent(error.message || 'Gmail connection failed')
           : '/login?error=' + encodeURIComponent(error.message || 'Google sign-in failed')
         res.writeHead(302, { location: CLIENT_ORIGIN.replace(/\/$/, '') + failureDestination })
         return res.end()
