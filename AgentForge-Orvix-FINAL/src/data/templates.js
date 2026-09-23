@@ -8,7 +8,7 @@ const emailAutomation = {
     { id: 'n2', type: 'workflow', position: { x: 320, y: 140 }, data: { kind: 'action', icon: 'Inbox', title: 'Prepare Inbox', subtitle: 'Prepare new messages', instructions: 'Prepare newly arrived demo inbox messages for analysis.' } },
     { id: 'n3', type: 'workflow', position: { x: 600, y: 140 }, data: { kind: 'ai', icon: 'Sparkles', title: 'AI Summarizer', subtitle: 'Summarize & find important', instructions: 'Summarize the email and identify important messages.' } },
     { id: 'n4', type: 'workflow', position: { x: 880, y: 140 }, data: { kind: 'condition', icon: 'AlertTriangle', title: 'Urgency Check', subtitle: 'Is it urgent?', instructions: 'Continue when at least one newly arrived email is available.' } },
-    { id: 'n5', type: 'workflow', position: { x: 700, y: 320 }, data: { kind: 'action', icon: 'CheckSquare', title: 'Create Task', subtitle: 'Add to task list', instructions: 'Create a task for each important item.' } },
+    { id: 'n5', type: 'workflow', position: { x: 700, y: 320 }, data: { kind: 'action', icon: 'CheckSquare', title: 'Prepare Follow-ups', subtitle: 'List concrete actions', instructions: 'Prepare a concise follow-up list for important messages.' } },
     { id: 'n6', type: 'workflow', position: { x: 980, y: 320 }, data: { kind: 'output', icon: 'Bell', title: 'Notify User', subtitle: 'Send notification', instructions: 'Send a notification to the user.', destination: '' } },
   ],
   edges: [
@@ -23,7 +23,7 @@ const emailAutomation = {
     'Email content prepared',
     '3 demo messages loaded',
     '1 high-priority issue detected',
-    '2 follow-up actions identified',
+    '2 follow-up actions prepared',
     'Notification sent',
   ],
   results: [
