@@ -11,7 +11,7 @@ import { deliverNotification, extractDestinationFromPrompt, resolveChannel, vali
 import { smsStatus } from './sms.js'
 import { executeWorkflow } from './executor.js'
 import { startScheduler } from './scheduler.js'
-import { googleConfigured, googleAuthLoginUrl, exchangeGoogleAuthCode, refreshGoogleAccessToken, fetchGoogleUserInfo, validateGmailAccessToken } from './oauth.js'
+import { googleConfigured, googleAuthLoginUrl, exchangeGoogleAuthCode, refreshGoogleAccessToken, fetchGoogleUserInfo, validateGmailAccessToken, GMAIL_READONLY_SCOPE } from './oauth.js'
 import { rateLimit } from './rate-limit.js'
 import { getAppConfig, resolveAllowedOrigins } from './config.js'
 
@@ -332,6 +332,10 @@ async function handle(req, res) {
           if (!user) throw new Error('Your AgentForge account could not be found. Please sign in again.')
           // Validate the newly issued token before replacing an existing Gmail connection.
           // This prevents an old profile-only token from surviving a failed Gmail grant.
+          const grantedScopes = String(tokenResult.scope || '').split(/\s+/).filter(Boolean)
+          if (!grantedScopes.includes(GMAIL_READONLY_SCOPE)) {
+            throw new Error('Google did not grant Gmail read access. Reconnect Gmail and approve the Gmail read permission.')
+          }
           await validateGmailAccessToken(tokenResult.access_token)
           if (!tokenResult.refresh_token) {
             throw new Error('Google did not issue a fresh Gmail authorization token. Remove AgentForge from your Google Account connected apps, then connect Gmail again and approve Gmail read access.')
