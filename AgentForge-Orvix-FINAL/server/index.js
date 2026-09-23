@@ -295,6 +295,11 @@ async function handle(req, res) {
       const forwardedProto = String(req.headers['x-forwarded-proto'] || '').split(',')[0].trim() || 'https'
       const publicOrigin = appConfig.publicApiOrigin || `${forwardedProto}://${req.headers.host}`
       const redirectUri = `${publicOrigin.replace(/\/$/, '')}/api/auth/google/callback`
+      // A reconnect must never fall back to an older/broken Gmail grant.
+      // Clear the existing Gmail credentials before beginning the fresh OAuth flow.
+      delete user.gmailAccessToken
+      delete user.gmailRefreshToken
+      delete user.gmailTokenExpiresAt
       db.oauthStates[state] = {
         type: 'gmail',
         email: user.email,
