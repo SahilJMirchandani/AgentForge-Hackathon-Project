@@ -72,7 +72,7 @@ export function googleAuthLoginUrl(state, { gmail = false, email = '', redirectU
   const { clientId } = config()
   if (!clientId) throw new Error('Google OAuth is not configured')
   const callbackUri = redirectUri || googleAuthLoginRedirectUri()
-  if (isDemoClient()) return `${redirectUri}?state=${state}&code=demo_auth_code`
+  if (isDemoClient()) return `${callbackUri}?state=${state}&code=demo_auth_code`
   const params = new URLSearchParams({
     client_id: clientId,
     redirect_uri: callbackUri,
