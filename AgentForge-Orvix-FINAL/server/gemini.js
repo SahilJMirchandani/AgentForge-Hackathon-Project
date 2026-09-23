@@ -465,7 +465,7 @@ function deterministicAgentFallback({ instructions, input, workflow }) {
         : 'Informational'
       return `${index + 1}. ${subject} — ${sender}\n   ${urgency}: ${excerpt}`
     })
-    return `Demo inbox summary (\\${input.count || input.messages.length} messages)\\n\\n${lines.join('\\n\\n')}`
+    return `Demo inbox summary (${input.count || input.messages.length} messages)\n\n${lines.join('\n\n')}`
   }
 
   const text = typeof input === 'string' ? input : JSON.stringify(input)
