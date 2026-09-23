@@ -160,6 +160,7 @@ export async function executeWorkflow(workflow, user, input = {}) {
                   delete user.gmailRefreshToken
                   delete user.gmailTokenExpiresAt
                   refreshError.message = 'Gmail authorization has expired or been revoked. Reconnect Gmail in Settings, then run the agent again.'
+                  run.gmailReconnectRequired = true
                 }
                 throw refreshError
               }
