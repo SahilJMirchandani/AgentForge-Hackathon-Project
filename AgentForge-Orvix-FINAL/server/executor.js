@@ -136,7 +136,7 @@ export async function executeWorkflow(workflow, user, input = {}) {
         const isGmailTrigger = /\bgmail\b|\binbox\b|new email.*arriv|email.*arriv/.test(triggerText) || /\bgmail\b|\binbox\b|monitor.*email|check.*email|read.*email|unread.*email/.test(promptText)
         if (isGmailTrigger) {
           if (!user?.gmailAccessToken && !user?.gmailRefreshToken) throw new Error('Gmail is not connected. Go to Settings and click Connect Gmail before running this email agent.')
-          const gmailQuery = input?.gmailQuery || (input?.trigger === 'gmail-poll' ? `after:${Math.max(0, Math.floor((Date.now() - 2000) / 1000))}`) : 'is:unread'
+          const gmailQuery = input?.gmailQuery || (input?.trigger === 'gmail-poll' ? `after:${Math.max(0, Math.floor((Date.now() - 2000) / 1000))}` : 'is:unread')
           let messages
           try {
             // Use a stored access token when present. If only a refresh token remains,
