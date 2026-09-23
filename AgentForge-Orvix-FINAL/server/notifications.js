@@ -37,6 +37,7 @@ function topicFromPrompt(prompt) {
     .replace(/^(please\s+)?(?:summar(?:ize|ise)|analy[sz]e|review|check|monitor|track|read|process|find|identify|detect|classify|extract|prepare|create|notify|send|report|automate|build|make)\b\s*/i, '')
     .replace(/^(?:my|the|a|an)\s+/i, '')
     .replace(/\b(?:and|then)\s+(?:email|notify|send)\s+.*$/i, '')
+    .replace(/\s+(?:and|then)\s*$/i, '')
     .trim()
   return compactSubject(topic || raw, 72)
 }
