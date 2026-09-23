@@ -36,9 +36,8 @@ export const DEMO_INBOX_MESSAGES = [
   },
 ]
 
-export function fetchDemoInboxMessages({ query = 'is:unread', limit = 20 } = {}) {
+export function fetchDemoInboxMessages({ limit = 20 } = {}) {
   const messages = DEMO_INBOX_MESSAGES
-    .filter((message) => query !== 'is:unread' || true)
     .sort((a, b) => Number(b.internalDate) - Number(a.internalDate))
     .slice(0, limit)
 
