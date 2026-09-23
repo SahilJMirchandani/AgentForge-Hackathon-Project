@@ -34,7 +34,7 @@ export default function Settings() {
       window.history.replaceState({}, '', '/settings')
     }
     if (params.get('gmail') === 'error') {
-      setGmailStatus('Gmail connection was not completed. Please try again.')
+      setGmailStatus(params.get('message') || 'Gmail connection was not completed. Please try again.')
       window.history.replaceState({}, '', '/settings')
     }
   }, [])
