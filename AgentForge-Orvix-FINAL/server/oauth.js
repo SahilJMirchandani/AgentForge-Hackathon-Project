@@ -77,10 +77,10 @@ export function googleAuthLoginUrl(state, { gmail = false, email = '', redirectU
     client_id: clientId,
     redirect_uri: callbackUri,
     response_type: 'code',
-    scope: gmail ? `openid email profile ${GMAIL_READONLY_SCOPE}` : 'openid email profile',
+    scope: gmail ? GMAIL_READONLY_SCOPE : 'openid email profile',
     state,
     access_type: 'offline',
-    include_granted_scopes: 'true',
+    include_granted_scopes: gmail ? 'false' : 'true',
     ...(String(email || '').trim() ? { login_hint: String(email).trim() } : {}),
     prompt: gmail ? 'consent select_account' : 'select_account',
   })
@@ -177,4 +177,38 @@ export async function fetchGoogleUserInfo(accessToken) {
     picture: profile.picture || null,
     verified_email: profile.verified_email === true,
   }
+}
+
+
+export async function validateGmailAccessToken(accessToken) {
+  if (!accessToken) throw new Error('Gmail authorization is missing. Connect Gmail again.')
+  const controller = new AbortController()
+  const timeout = setTimeout(() => controller.abort(), 15000)
+  let response
+  try {
+    response = await fetch('https://gmail.googleapis.com/gmail/v1/users/me/profile', {
+      headers: { authorization: `Bearer ${accessToken}` },
+      signal: controller.signal,
+    })
+  } finally {
+    clearTimeout(timeout)
+  }
+  if (!response.ok) {
+    const detail = await response.text().catch(() => '')
+    let providerMessage = ''
+    try {
+      const payload = JSON.parse(detail)
+      providerMessage = payload?.error?.message || payload?.error?.status || ''
+    } catch {}
+    const error = new Error(
+      response.status === 401
+        ? 'Google returned an invalid Gmail access token. Please connect Gmail again.'
+        : response.status === 403
+          ? `Google did not grant Gmail read access to this token${providerMessage ? ` (${providerMessage})` : ''}. Please reconnect Gmail and allow the requested permission.`
+          : `Gmail authorization check failed (${response.status})`,
+    )
+    error.status = response.status
+    throw error
+  }
+  return true
 }
