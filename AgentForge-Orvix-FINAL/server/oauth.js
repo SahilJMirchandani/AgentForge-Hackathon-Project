@@ -2,7 +2,7 @@ import { existsSync, readFileSync } from 'node:fs'
 
 const GOOGLE_AUTH_URL = 'https://accounts.google.com/o/oauth2/v2/auth'
 const GOOGLE_TOKEN_URL = 'https://oauth2.googleapis.com/token'
-const GMAIL_READONLY_SCOPE = 'https://www.googleapis.com/auth/gmail.readonly'
+export const GMAIL_READONLY_SCOPE = 'https://www.googleapis.com/auth/gmail.readonly'
 
 function loadEnvFile() {
   try {
