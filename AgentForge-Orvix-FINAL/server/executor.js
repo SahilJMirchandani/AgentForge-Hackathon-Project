@@ -143,7 +143,25 @@ export async function executeWorkflow(workflow, user, input = {}) {
             if (refreshed.refresh_token) user.gmailRefreshToken = refreshed.refresh_token
           }
           const gmailQuery = input?.gmailQuery || 'is:unread'
-          const messages = await fetchGmailMessages(user.gmailAccessToken, 10, gmailQuery)
+          let messages
+          try {
+            messages = await fetchGmailMessages(user.gmailAccessToken, 10, gmailQuery)
+          } catch (gmailError) {
+            if ((gmailError.status === 401 || gmailError.status === 403) && user.gmailRefreshToken) {
+              try {
+                const refreshed = await refreshGoogleAccessToken(user.gmailRefreshToken)
+                user.gmailAccessToken = refreshed.access_token
+                user.gmailTokenExpiresAt = Date.now() + Number(refreshed.expires_in || 3600) * 1000
+                if (refreshed.refresh_token) user.gmailRefreshToken = refreshed.refresh_token
+                messages = await fetchGmailMessages(user.gmailAccessToken, 10, gmailQuery)
+              } catch (refreshError) {
+                refreshError.status = refreshError.status || gmailError.status
+                throw refreshError
+              }
+            } else {
+              throw gmailError
+            }
+          }
           run.gmailMessageCount = messages.length
           if (messages.length) run.gmailNewestMessageAt = Math.max(...messages.map((message) => Number(message.internalDate || 0)).filter(Boolean)) || Date.now()
           context = {
