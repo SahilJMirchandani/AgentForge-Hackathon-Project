@@ -21,9 +21,15 @@ export default function Settings() {
   const [savingNotifications, setSavingNotifications] = useState(false)
   const [gmailStatus, setGmailStatus] = useState('')
   const [connectingGmail, setConnectingGmail] = useState(false)
+  const [gmailConnectedLocal, setGmailConnectedLocal] = useState(gmailConnected)
+  useEffect(() => {
+    setGmailConnectedLocal(gmailConnected)
+  }, [gmailConnected])
+
   useEffect(() => {
     const params = new URLSearchParams(window.location.search)
     if (params.get('gmail') === 'connected') {
+      setGmailConnectedLocal(true)
       setGmailStatus('Gmail connected successfully. Your email agents can now read unread messages.')
       window.history.replaceState({}, '', '/settings')
     }
@@ -137,7 +143,7 @@ export default function Settings() {
             <div>
               <p className="text-sm font-medium text-ink">Gmail connection</p>
               <p className="text-xs text-ink-soft mt-1">
-                {gmailConnected
+                {gmailConnectedLocal
                   ? 'Connected. Email agents can read unread messages from this Gmail account.'
                   : 'Connect Gmail only when you want an email agent to read your inbox. Google sign-in itself does not require Gmail access.'}
               </p>
@@ -148,7 +154,7 @@ export default function Settings() {
               disabled={connectingGmail}
               className="shrink-0 px-4 py-2.5 rounded-control border border-border text-sm font-medium text-ink hover:bg-canvas disabled:opacity-50 transition-colors"
             >
-              {connectingGmail ? 'Connecting…' : gmailConnected ? 'Reconnect Gmail' : 'Connect Gmail'}
+              {connectingGmail ? 'Connecting…' : gmailConnectedLocal ? 'Reconnect Gmail' : 'Connect Gmail'}
             </button>
           </div>
         </div>
