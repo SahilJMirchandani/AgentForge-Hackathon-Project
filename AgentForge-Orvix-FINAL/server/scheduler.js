@@ -44,7 +44,7 @@ export function startScheduler({ db, executeWorkflow, saveDb, notify, intervalMs
         }
         workflow.lastScheduledRunAt = now
         const input = schedule.gmail
-          ? { trigger: 'gmail-poll', gmailQuery: `after:${Math.max(0, Math.floor((Number(workflow.gmailLastSeenAt) - 2000) / 1000))}` }
+          ? { trigger: 'gmail-poll', gmailQuery: `after:${Math.max(0, Math.floor((Number(workflow.gmailLastSeenAt) - 2000) / 1000))}`, gmailSince: Number(workflow.gmailLastSeenAt) }
           : { trigger: 'schedule', scheduledAt: now }
         const run = await executeWorkflow(workflow, owner, input)
         if (schedule.gmail && run.status === 'Completed' && run.gmailNewestMessageAt) workflow.gmailLastSeenAt = run.gmailNewestMessageAt
