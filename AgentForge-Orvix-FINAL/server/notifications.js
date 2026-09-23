@@ -27,7 +27,7 @@ function compactSubject(value, maxLength = 90) {
     .replace(/^[\s\-:;,]+|[\s\-:;,]+$/g, '')
     .trim()
   if (!text) return ''
-  return text.length > maxLength ? `${text.slice(0, maxLength - 1)'}…` : text
+  return text.length > maxLength ? `${text.slice(0, maxLength - 1)}…` : text
 }
 
 function topicFromPrompt(prompt) {
