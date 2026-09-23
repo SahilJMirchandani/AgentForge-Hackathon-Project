@@ -277,7 +277,7 @@ async function handle(req, res) {
       const redirectUri = `${publicOrigin.replace(/\/$/, '')}/api/auth/google/callback`
       db.oauthStates[state] = { type: 'login', redirectUri, expiresAt: Date.now() + 10 * 60 * 1000 }
       const googleUrl = googleAuthLoginUrl(state, { redirectUri })
-      saveDb(db).catch((error) => console.warn(`Google login state persistence warning: ${error.message}`))
+      await saveDb(db).catch((error) => console.warn(`Google login state persistence warning: ${error.message}`))
       if (req.method === 'POST') {
         return json(res, 200, { url: googleUrl }, allowedOrigin, { 'set-cookie': `agentforge-google-auth-state=${state}; HttpOnly; SameSite=Lax; Path=/api/auth/google; Max-Age=600` })
       }
@@ -302,7 +302,7 @@ async function handle(req, res) {
         expiresAt: Date.now() + 10 * 60 * 1000,
       }
       const googleUrl = googleAuthLoginUrl(state, { gmail: true, email: user.email, redirectUri })
-      saveDb(db).catch((error) => console.warn(`Gmail OAuth state persistence warning: ${error.message}`))
+      await saveDb(db).catch((error) => console.warn(`Gmail OAuth state persistence warning: ${error.message}`))
       return json(res, 200, { url: googleUrl }, allowedOrigin)
     }
     if (req.method === 'GET' && url.pathname === '/api/auth/google/callback') {
