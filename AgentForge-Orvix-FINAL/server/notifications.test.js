@@ -84,6 +84,32 @@ describe('notification delivery', () => {
     ;({ deliverNotification } = await import('./notifications.js'))
   })
 
+  it('derives an email subject from the workflow topic instead of using a random generic subject', async () => {
+    await deliverNotification({
+      node: { data: { kind: 'output', channel: 'email', destination: 'alerts@team.io' } },
+      user: { email: 'owner@example.com' },
+      workflow: { name: 'Customer Agent', prompt: 'Analyze delayed shipment complaints and email me the findings.' },
+      input: { message: 'Customer reports a shipment is delayed by three days.' },
+      output: 'Delayed shipment complaint detected.',
+    })
+    expect(sendWorkflowEmail).toHaveBeenCalledWith(expect.objectContaining({
+      subject: 'Analysis — delayed shipment complaints',
+    }))
+  })
+
+  it('derives inbox subjects from processed message counts', async () => {
+    await deliverNotification({
+      node: { data: { kind: 'output', channel: 'email', destination: 'alerts@team.io' } },
+      user: { email: 'owner@example.com' },
+      workflow: { name: 'Email Automation Agent', prompt: 'Summarize my inbox and email me.' },
+      input: 'summarize my inbox',
+      output: 'INBOX SUMMARY\nMessages processed: 3\n\nEMAIL DETAILS\n1. Subject: Action required — reporting API latency',
+    })
+    expect(sendWorkflowEmail).toHaveBeenCalledWith(expect.objectContaining({
+      subject: 'Inbox Summary — 3 messages',
+    }))
+  })
+
   it('sends to the address configured on the node', async () => {
     const result = await deliverNotification({
       node: { data: { kind: 'output', channel: 'email', destination: 'alerts@team.io' } },
