@@ -11,7 +11,7 @@ import { deliverNotification, extractDestinationFromPrompt, resolveChannel, vali
 import { smsStatus } from './sms.js'
 import { executeWorkflow } from './executor.js'
 import { startScheduler } from './scheduler.js'
-import { googleConfigured, googleAuthLoginUrl, exchangeGoogleAuthCode, fetchGoogleUserInfo } from './oauth.js'
+import { googleConfigured, googleAuthLoginUrl, exchangeGoogleAuthCode, refreshGoogleAccessToken, fetchGoogleUserInfo, validateGmailAccessToken } from './oauth.js'
 import { rateLimit } from './rate-limit.js'
 import { getAppConfig, resolveAllowedOrigins } from './config.js'
 
